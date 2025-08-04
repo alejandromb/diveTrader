@@ -97,15 +97,23 @@ class BTCScalpingStrategy:
             # Get current market data
             bars_data = self._get_recent_bars()
             if bars_data is None or len(bars_data) < self.config["lookback_periods"]:
-                logger.debug("Insufficient data for analysis")
+                logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] ASSESSMENT: Insufficient data for analysis (got {len(bars_data) if bars_data is not None else 0} bars, need {self.config['lookback_periods']})")
                 return
                 
+            # Get current price for logging
+            current_price = bars_data.iloc[-1]['close']
+            current_volume = bars_data.iloc[-1]['volume']
+            
             # Analyze market and generate signals
             signal = self._analyze_market(bars_data)
             
-            # Execute trading logic
+            # Log detailed assessment
+            assessment_time = datetime.now().strftime('%H:%M:%S')
             if signal:
+                logger.info(f"[{assessment_time}] SIGNAL: {signal} - Price: ${current_price:.2f}, Volume: {current_volume:.0f}")
                 self._execute_signal(signal, bars_data.iloc[-1])
+            else:
+                logger.info(f"[{assessment_time}] NO ACTION - Price: ${current_price:.2f}, Volume: {current_volume:.0f} - Conditions not met")
                 
             # Check existing positions
             if self.current_position:
@@ -269,26 +277,44 @@ class BTCScalpingStrategy:
             
             # Check volume
             if latest['volume'] < self.config["min_volume"]:
+                logger.info(f"  ❌ Volume too low: {latest['volume']:.0f} < {self.config['min_volume']}")
                 return None
             
             # Avoid rapid-fire signals
             current_time = datetime.now()
             if (self.last_signal_time and 
                 (current_time - self.last_signal_time).seconds < 300):  # 5 minutes
+                time_since_last = (current_time - self.last_signal_time).seconds
+                logger.info(f"  ❌ Cooldown active: {time_since_last}s since last signal (need 300s)")
                 return None
             
             # Moving average crossover strategy
             current_short_ma = latest['short_ma']
             current_long_ma = latest['long_ma']
+            current_price = latest['close']
             
             # Check for valid MA values
             if pd.isna(current_short_ma) or pd.isna(current_long_ma):
+                logger.info(f"  ❌ Invalid MA values: Short MA={current_short_ma}, Long MA={current_long_ma}")
                 return None
             
+            # Log current conditions
+            short_above_long = current_short_ma > current_long_ma
+            price_above_short = current_price > current_short_ma
+            
+            logger.info(f"  📊 Technical Analysis:")
+            logger.info(f"     Short MA ({self.config['short_ma_periods']}): ${current_short_ma:.2f}")
+            logger.info(f"     Long MA ({self.config['long_ma_periods']}): ${current_long_ma:.2f}")
+            logger.info(f"     Price > Short MA: {price_above_short} (${current_price:.2f} > ${current_short_ma:.2f})")
+            logger.info(f"     Short MA > Long MA: {short_above_long}")
+            logger.info(f"     Volume OK: ✅ ({latest['volume']:.0f} > {self.config['min_volume']})")
+            
             # Buy signal: short MA crosses above long MA
-            if (current_short_ma > current_long_ma and 
-                latest['close'] > current_short_ma):
+            if short_above_long and price_above_short:
+                logger.info(f"  ✅ BUY conditions met!")
                 return "BUY"
+            else:
+                logger.info(f"  ❌ BUY conditions not met")
             
             return None
             

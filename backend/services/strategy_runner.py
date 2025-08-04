@@ -46,6 +46,9 @@ class StrategyRunner:
                 logger.error(f"Failed to create strategy instance for {strategy_id}")
                 return False
                 
+            # Add to running strategies BEFORE starting thread to avoid race condition
+            self.strategy_instances[strategy_id] = strategy_instance
+            
             # Start strategy in separate thread
             thread = threading.Thread(
                 target=self._run_strategy,
@@ -53,10 +56,10 @@ class StrategyRunner:
                 daemon=True,
                 name=f"Strategy-{strategy_id}"
             )
-            thread.start()
             
+            # Mark as running before starting thread
             self.running_strategies[strategy_id] = thread
-            self.strategy_instances[strategy_id] = strategy_instance
+            thread.start()
             
             logger.info(f"Started strategy {strategy.name} (ID: {strategy_id})")
             # Log strategy start event

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from database.database import get_db
 from database.models import EventLogLevel
 from services.strategy_event_logger import strategy_event_logger
@@ -13,7 +13,7 @@ class EventLogResponse(BaseModel):
     level: str
     event_type: str
     message: str
-    details: dict = None
+    details: Optional[Dict[str, Any]] = None
     timestamp: str
 
 @router.get("/strategy/{strategy_id}", response_model=List[EventLogResponse])

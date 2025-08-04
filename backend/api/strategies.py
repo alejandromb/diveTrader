@@ -6,6 +6,7 @@ from services.performance_service import PerformanceService
 from services.trading_service import TradingService
 from services.strategy_runner import strategy_runner
 from services.backtesting_service import BacktestingService
+from services.account_sync_service import AccountSyncService
 from pydantic import BaseModel
 from typing import List, Optional
 import json
@@ -14,6 +15,7 @@ router = APIRouter(prefix="/api/strategies", tags=["strategies"])
 performance_service = PerformanceService()
 trading_service = TradingService()
 backtesting_service = BacktestingService()
+account_sync_service = AccountSyncService()
 
 class StrategyCreate(BaseModel):
     name: str
@@ -201,6 +203,30 @@ async def run_backtest(strategy_id: int, request: BacktestRequest, db: Session =
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backtest failed: {str(e)}")
+
+@router.post("/{strategy_id}/sync-account")
+async def sync_account(strategy_id: int, db: Session = Depends(get_db)):
+    """Sync strategy capital with Alpaca account"""
+    try:
+        success = account_sync_service.sync_strategy_capital(strategy_id, db)
+        if success:
+            return {"message": "Account synced successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to sync account")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/account-info")
+async def get_account_info():
+    """Get current Alpaca account information"""
+    try:
+        account_info = account_sync_service.get_account_info()
+        if account_info:
+            return account_info
+        else:
+            raise HTTPException(status_code=500, detail="Failed to get account info")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{strategy_id}/sync-positions")
 async def sync_positions(strategy_id: int, db: Session = Depends(get_db)):

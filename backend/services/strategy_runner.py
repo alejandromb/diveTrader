@@ -49,7 +49,8 @@ class StrategyRunner:
             thread = threading.Thread(
                 target=self._run_strategy,
                 args=(strategy_id, strategy_instance),
-                daemon=True
+                daemon=True,
+                name=f"Strategy-{strategy_id}"
             )
             thread.start()
             
@@ -96,13 +97,17 @@ class StrategyRunner:
         """Create strategy instance based on type"""
         try:
             if strategy.strategy_type == StrategyType.BTC_SCALPING:
-                return BTCScalpingStrategy(
+                strategy_instance = BTCScalpingStrategy(
                     strategy_id=strategy.id,
                     trading_service=self.trading_service,
                     performance_service=self.performance_service,
                     db_session=db,
                     config=strategy.config
                 )
+                # Start the strategy instance
+                strategy_instance.start()
+                logger.info(f"Strategy instance created and started: {strategy_instance}")
+                return strategy_instance
             elif strategy.strategy_type == StrategyType.PORTFOLIO_DISTRIBUTOR:
                 # TODO: Implement portfolio distributor
                 logger.warning("Portfolio distributor strategy not implemented yet")
@@ -121,29 +126,42 @@ class StrategyRunner:
         
         while not self._shutdown and strategy_id in self.running_strategies:
             try:
-                # Check if strategy is still active in database
+                # Create new DB session for each iteration
                 db = SessionLocal()
-                strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
-                
-                if not strategy or not strategy.is_active:
-                    logger.info(f"Strategy {strategy_id} deactivated, stopping...")
-                    break
+                try:
+                    # Check if strategy is still active in database
+                    strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
                     
-                # Run strategy iteration
-                if hasattr(strategy_instance, 'run_iteration'):
-                    strategy_instance.run_iteration()
+                    if not strategy or not strategy.is_active:
+                        logger.info(f"Strategy {strategy_id} deactivated, stopping...")
+                        break
+                        
+                    # Update strategy instance with fresh DB session
+                    strategy_instance.db_session = db
+                        
+                    # Run strategy iteration
+                    if hasattr(strategy_instance, 'run_iteration'):
+                        logger.info(f"Running iteration for strategy {strategy_id}")
+                        strategy_instance.run_iteration()
+                        logger.info(f"Completed iteration for strategy {strategy_id}")
+                        
+                    # Update performance metrics
+                    self.performance_service.update_daily_performance(strategy_id, db)
                     
-                # Update performance metrics
-                self.performance_service.update_daily_performance(strategy_id, db)
-                
-                db.close()
+                    # Commit any changes
+                    db.commit()
+                    
+                finally:
+                    db.close()
                 
                 # Wait before next iteration
-                threading.Event().wait(self.check_interval)
+                import time
+                time.sleep(self.check_interval)
                 
             except Exception as e:
                 logger.error(f"Error in strategy {strategy_id} loop: {e}")
-                threading.Event().wait(self.check_interval)
+                import time
+                time.sleep(self.check_interval)
                 
         logger.info(f"Strategy {strategy_id} thread stopped")
         

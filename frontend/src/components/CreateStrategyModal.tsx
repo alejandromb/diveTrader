@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DEFAULT_PORTFOLIO, DEFAULT_STRATEGY_CONFIG, INVESTMENT_DEFAULTS } from '../config/constants';
 
 interface CreateStrategyModalProps {
   onClose: () => void;
@@ -32,26 +33,21 @@ const CreateStrategyModal: React.FC<CreateStrategyModalProps> = ({ onClose, onCr
   const [formData, setFormData] = useState<CreateStrategyData>({
     name: '',
     strategy_type: 'btc_scalping',
-    initial_capital: 10000,
+    initial_capital: INVESTMENT_DEFAULTS.INITIAL_CAPITAL,
     config: {}
   });
 
-  const [btcConfig, setBtcConfig] = useState({
-    risk_per_trade: 2,
-    max_daily_trades: 10,
-    stop_loss_percent: 2,
-    take_profit_percent: 3
-  });
+  const [btcConfig, setBtcConfig] = useState(DEFAULT_STRATEGY_CONFIG.BTC_SCALPING);
 
   const [portfolioConfig, setPortfolioConfig] = useState({
-    symbols: ['AAPL', 'MSFT', 'GOOGL', 'TSLA'],
-    investment_frequency: 'weekly' as const,
-    investment_amount: 1000,
-    rebalance_threshold: 5
+    symbols: DEFAULT_PORTFOLIO.SYMBOLS,
+    investment_frequency: DEFAULT_STRATEGY_CONFIG.PORTFOLIO_DISTRIBUTOR.investment_frequency,
+    investment_amount: DEFAULT_STRATEGY_CONFIG.PORTFOLIO_DISTRIBUTOR.investment_amount,
+    rebalance_threshold: DEFAULT_STRATEGY_CONFIG.PORTFOLIO_DISTRIBUTOR.rebalance_threshold
   });
 
-  const [portfolioSymbolsText, setPortfolioSymbolsText] = useState('AAPL,MSFT,GOOGL,TSLA');
-  const [portfolioWeightsText, setPortfolioWeightsText] = useState('25,25,25,25');
+  const [portfolioSymbolsText, setPortfolioSymbolsText] = useState(DEFAULT_PORTFOLIO.SYMBOLS_TEXT);
+  const [portfolioWeightsText, setPortfolioWeightsText] = useState(DEFAULT_PORTFOLIO.WEIGHTS_TEXT);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,7 +195,7 @@ const CreateStrategyModal: React.FC<CreateStrategyModalProps> = ({ onClose, onCr
                   type="text"
                   value={portfolioSymbolsText}
                   onChange={(e) => setPortfolioSymbolsText(e.target.value)}
-                  placeholder="AAPL, MSFT, GOOGL, TSLA"
+                  placeholder={DEFAULT_PORTFOLIO.SYMBOLS.join(', ')}
                 />
               </div>
               
@@ -209,7 +205,7 @@ const CreateStrategyModal: React.FC<CreateStrategyModalProps> = ({ onClose, onCr
                   type="text"
                   value={portfolioWeightsText}
                   onChange={(e) => setPortfolioWeightsText(e.target.value)}
-                  placeholder="25, 25, 25, 25"
+                  placeholder={DEFAULT_PORTFOLIO.WEIGHTS_TEXT}
                 />
               </div>
               

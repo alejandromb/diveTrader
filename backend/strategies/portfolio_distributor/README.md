@@ -31,13 +31,16 @@ The Portfolio Distributor Strategy implements systematic investment using dollar
 ```json
 {
   "portfolio_distributor": {
-    "symbols": ["AAPL", "MSFT", "GOOGL", "TSLA", "SPY"],
+    "symbols": ["SPY", "NVDA", "V", "JNJ", "UNH", "PG", "JPM", "MSFT"],
     "allocation_weights": {
-      "AAPL": 25.0,     // 25% allocation
-      "MSFT": 25.0,     // 25% allocation  
-      "GOOGL": 20.0,    // 20% allocation
-      "TSLA": 15.0,     // 15% allocation
-      "SPY": 15.0       // 15% allocation (total must equal 100%)
+      "SPY": 20.0,      // 20% - S&P 500 ETF
+      "NVDA": 15.0,     // 15% - NVIDIA
+      "V": 12.5,        // 12.5% - Visa
+      "JNJ": 12.5,      // 12.5% - Johnson & Johnson
+      "UNH": 12.5,      // 12.5% - UnitedHealth
+      "PG": 10.0,       // 10% - Procter & Gamble
+      "JPM": 10.0,      // 10% - JPMorgan Chase
+      "MSFT": 7.5       // 7.5% - Microsoft (total = 100%)
     },
     "investment_frequency": "weekly",    // "weekly" or "monthly"
     "investment_amount": 1000,           // Amount to invest each period
@@ -71,11 +74,14 @@ The Portfolio Distributor Strategy implements systematic investment using dollar
 ## Portfolio Management
 
 ### **Default Portfolio**
-- **AAPL** (Apple): 25% - Technology leader
-- **MSFT** (Microsoft): 25% - Cloud computing
-- **GOOGL** (Google): 20% - Digital advertising
-- **TSLA** (Tesla): 15% - Electric vehicles
-- **SPY** (S&P 500 ETF): 15% - Market diversification
+- **SPY** (S&P 500 ETF): 20% - Broad market exposure
+- **NVDA** (NVIDIA): 15% - AI/semiconductor leader
+- **V** (Visa): 12.5% - Payment processing monopoly
+- **JNJ** (Johnson & Johnson): 12.5% - Healthcare/pharmaceuticals
+- **UNH** (UnitedHealth): 12.5% - Healthcare services
+- **PG** (Procter & Gamble): 10% - Consumer staples
+- **JPM** (JPMorgan): 10% - Financial services
+- **MSFT** (Microsoft): 7.5% - Cloud/enterprise software
 
 ### **Allocation Strategies**
 

@@ -105,7 +105,7 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
       </div>
 
       <div className="strategy-actions">
-        <div className="primary-actions">
+        <div className="left-actions">
           {strategy.is_running ? (
             <button 
               className="btn btn-danger"
@@ -129,9 +129,7 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
               Start Strategy
             </button>
           )}
-        </div>
-        
-        <div className="secondary-actions">
+          
           {onViewLogs && (
             <button 
               className="btn btn-outline-info btn-sm"
@@ -144,6 +142,9 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
               📋
             </button>
           )}
+        </div>
+        
+        <div className="right-actions">
           <button 
             className="btn btn-outline-danger btn-sm"
             onClick={(e) => {

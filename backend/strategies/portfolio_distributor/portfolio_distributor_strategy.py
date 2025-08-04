@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from database.models import Strategy, Position, Trade, Portfolio
 from services.trading_service import TradingService
 from alpaca.trading.enums import OrderSide
+from config.constants import DEFAULT_PORTFOLIO_SYMBOLS, DEFAULT_PORTFOLIO_WEIGHTS
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +14,13 @@ class PortfolioDistributorStrategy:
     def __init__(self, trading_service: TradingService):
         self.trading_service = trading_service
         self.logger = logging.getLogger(__name__)
+        self.db_session = None  # Will be set by strategy runner
+        self.strategy_id = None  # Will be set during initialization
         
     def initialize_strategy(self, strategy: Strategy, db: Session) -> bool:
         """Initialize portfolio distributor strategy"""
         try:
+            self.strategy_id = strategy.id  # Store strategy ID
             config = json.loads(strategy.config or '{}')
             portfolio_config = config.get('portfolio_distributor', {})
             
@@ -24,8 +28,8 @@ class PortfolioDistributorStrategy:
             portfolio = Portfolio(
                 strategy_id=strategy.id,
                 name=f"{strategy.name} Portfolio",
-                symbols=json.dumps(portfolio_config.get('symbols', ['AAPL', 'MSFT', 'GOOGL', 'TSLA'])),
-                allocation_weights=json.dumps(portfolio_config.get('allocation_weights', {})),
+                symbols=json.dumps(portfolio_config.get('symbols', DEFAULT_PORTFOLIO_SYMBOLS)),
+                allocation_weights=json.dumps(portfolio_config.get('allocation_weights', DEFAULT_PORTFOLIO_WEIGHTS)),
                 investment_frequency=portfolio_config.get('investment_frequency', 'weekly'),
                 investment_amount=portfolio_config.get('investment_amount', 1000),
                 next_investment_date=self._calculate_next_investment_date(
@@ -249,3 +253,17 @@ class PortfolioDistributorStrategy:
                 'status': 'error',
                 'error': str(e)
             }
+    
+    def run_iteration(self):
+        """Single iteration of the strategy - called by strategy runner"""
+        if not self.strategy_id or not self.db_session:
+            self.logger.error("Strategy not properly initialized")
+            return
+            
+        try:
+            result = self.run_strategy(self.strategy_id, self.db_session)
+            self.logger.info(f"Portfolio distributor iteration completed: {result}")
+            return result
+        except Exception as e:
+            self.logger.error(f"Error in portfolio distributor iteration: {e}")
+            return None

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_CONFIG } from '../config/constants';
 import StrategyCard from './StrategyCard';
 import PerformanceChart from './PerformanceChart';
 import BacktestModal from './BacktestModal';
@@ -68,7 +69,8 @@ interface Trade {
   created_at: string;
 }
 
-const API_BASE = 'http://localhost:8000/api';
+// ✅ FIXED: Now using centralized config with proper Vite env vars
+const API_BASE = API_CONFIG.BASE_URL;
 
 const Dashboard: React.FC = () => {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
@@ -106,10 +108,12 @@ const Dashboard: React.FC = () => {
       const strategiesData = response.data;
       
       // Fetch detailed status for each strategy to get runtime info
+      console.log('Fetching status for strategies:', strategiesData.map(s => s.id));
       const strategiesWithStatus = await Promise.all(
         strategiesData.map(async (strategy: Strategy) => {
           try {
             const statusResponse = await axios.get(`${API_BASE}/strategies/${strategy.id}/status`);
+            console.log(`Strategy ${strategy.id} status:`, statusResponse.data);
             return {
               ...strategy,
               is_running: statusResponse.data.is_running

@@ -8,6 +8,7 @@ from services.trading_service import TradingService
 from services.performance_service import PerformanceService
 from services.strategy_event_logger import strategy_event_logger
 from strategies.btc_scalping.btc_scalping_strategy import BTCScalpingStrategy
+from strategies.portfolio_distributor.portfolio_distributor_strategy import PortfolioDistributorStrategy
 import logging
 import os
 from datetime import datetime
@@ -120,9 +121,16 @@ class StrategyRunner:
                 logger.info(f"Strategy instance created and started: {strategy_instance}")
                 return strategy_instance
             elif strategy.strategy_type == StrategyType.PORTFOLIO_DISTRIBUTOR:
-                # TODO: Implement portfolio distributor
-                logger.warning("Portfolio distributor strategy not implemented yet")
-                return None
+                strategy_instance = PortfolioDistributorStrategy(
+                    trading_service=self.trading_service
+                )
+                # Initialize the strategy
+                if strategy_instance.initialize_strategy(strategy, db):
+                    logger.info(f"Portfolio distributor strategy instance created: {strategy_instance}")
+                    return strategy_instance
+                else:
+                    logger.error(f"Failed to initialize portfolio distributor strategy {strategy.id}")
+                    return None
             else:
                 logger.error(f"Unknown strategy type: {strategy.strategy_type}")
                 return None
@@ -148,7 +156,8 @@ class StrategyRunner:
                         break
                         
                     # Update strategy instance with fresh DB session
-                    strategy_instance.db_session = db
+                    if hasattr(strategy_instance, 'db_session'):
+                        strategy_instance.db_session = db
                         
                     # Run strategy iteration
                     if hasattr(strategy_instance, 'run_iteration'):
@@ -165,13 +174,16 @@ class StrategyRunner:
                         logger.info(f"Completed iteration for strategy {strategy_id}")
                         
                         # Log performance update
-                        metrics = self.performance_service.get_performance_summary(strategy_id, db)
-                        if metrics:
-                            strategy_event_logger.log_performance_update(db, strategy_id, {
-                                "roi": metrics.get("roi_percentage", 0),
-                                "pnl": metrics.get("total_pnl", 0),
-                                "total_trades": metrics.get("total_trades", 0)
-                            })
+                        try:
+                            metrics = self.performance_service.calculate_strategy_performance(strategy_id, db)
+                            if metrics:
+                                strategy_event_logger.log_performance_update(db, strategy_id, {
+                                    "roi": metrics.get("roi_percentage", 0),
+                                    "pnl": metrics.get("total_pnl", 0),
+                                    "total_trades": metrics.get("total_trades", 0)
+                                })
+                        except Exception as e:
+                            logger.warning(f"Could not log performance update: {e}")
                         
                     # Update performance metrics
                     self.performance_service.update_daily_performance(strategy_id, db)

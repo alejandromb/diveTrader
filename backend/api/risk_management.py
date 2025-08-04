@@ -6,7 +6,7 @@ from services.risk_management_service import RiskManagementService
 from services.trading_service import TradingService
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/risk", tags=["risk-management"])
+router = APIRouter(prefix="/api/risk", tags=["risk-management"])
 
 class RiskLimitsUpdate(BaseModel):
     max_portfolio_risk: float = None

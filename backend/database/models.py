@@ -33,6 +33,7 @@ class Strategy(Base):
     positions = relationship("Position", back_populates="strategy")
     trades = relationship("Trade", back_populates="strategy")
     performance_metrics = relationship("PerformanceMetric", back_populates="strategy")
+    event_logs = relationship("StrategyEventLog", back_populates="strategy")
 
 class Position(Base):
     __tablename__ = "positions"
@@ -106,3 +107,24 @@ class Portfolio(Base):
     next_investment_date = Column(DateTime)
     investment_amount = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class EventLogLevel(enum.Enum):
+    DEBUG = "debug"
+    INFO = "info"
+    WARN = "warn"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+class StrategyEventLog(Base):
+    __tablename__ = "strategy_event_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    strategy_id = Column(Integer, ForeignKey("strategies.id"))
+    level = Column(Enum(EventLogLevel), default=EventLogLevel.INFO)
+    event_type = Column(String(50))  # "trade_check", "signal_generated", "order_placed", "risk_alert", etc.
+    message = Column(Text)
+    details = Column(Text)  # JSON string for additional event data
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    strategy = relationship("Strategy", back_populates="event_logs")

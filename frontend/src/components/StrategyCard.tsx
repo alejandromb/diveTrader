@@ -17,6 +17,7 @@ interface StrategyCardProps {
   onStart: () => void;
   onStop: () => void;
   onDelete: () => void;
+  onViewLogs?: () => void;
 }
 
 const StrategyCard: React.FC<StrategyCardProps> = ({
@@ -25,7 +26,8 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
   onSelect,
   onStart,
   onStop,
-  onDelete
+  onDelete,
+  onViewLogs
 }) => {
   const getStrategyIcon = (type: string) => {
     switch (type) {
@@ -108,6 +110,18 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
         </div>
         
         <div className="secondary-actions">
+          {onViewLogs && (
+            <button 
+              className="btn btn-outline-info btn-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewLogs();
+              }}
+              title="View Event Logs"
+            >
+              📋
+            </button>
+          )}
           <button 
             className="btn btn-outline-danger btn-sm"
             onClick={(e) => {

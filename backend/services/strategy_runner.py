@@ -6,6 +6,7 @@ from database.database import SessionLocal
 from database.models import Strategy, StrategyType
 from services.trading_service import TradingService
 from services.performance_service import PerformanceService
+from services.strategy_event_logger import strategy_event_logger
 from strategies.btc_scalping_strategy import BTCScalpingStrategy
 import logging
 import os

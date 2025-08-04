@@ -4,6 +4,7 @@ from database.database import create_tables
 from api.strategies import router as strategies_router
 from api.trading import router as trading_router
 from api.risk_management import router as risk_router
+from api.strategy_events import router as events_router
 import os
 from dotenv import load_dotenv
 
@@ -30,6 +31,7 @@ app.add_middleware(
 app.include_router(strategies_router)
 app.include_router(trading_router)
 app.include_router(risk_router)
+app.include_router(events_router)
 
 @app.get("/")
 async def root():

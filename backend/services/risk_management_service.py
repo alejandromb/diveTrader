@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from database.models import Strategy, Position, Trade, PerformanceMetric
 from services.trading_service import TradingService
 from alpaca.trading.enums import OrderSide
@@ -187,7 +188,7 @@ class RiskManagementService:
                 Trade.executed_at >= today_start,
                 Trade.status == "filled"
             ).with_entities(
-                db.func.sum(Trade.realized_pnl).label('total_pnl')
+                func.sum(Trade.realized_pnl).label('total_pnl')
             ).scalar() or 0.0
             
             strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
@@ -340,7 +341,7 @@ class RiskManagementService:
                 Trade.strategy_id == strategy_id,
                 Trade.executed_at >= today_start,
                 Trade.status == "filled"
-            ).with_entities(db.func.sum(Trade.realized_pnl).label('total_pnl')).scalar() or 0.0
+            ).with_entities(func.sum(Trade.realized_pnl).label('total_pnl')).scalar() or 0.0
             
             daily_loss_percent = 0
             if strategy.current_capital > 0 and daily_pnl < 0:
@@ -399,7 +400,7 @@ class RiskManagementService:
             peak = db.query(PerformanceMetric).filter(
                 PerformanceMetric.strategy_id == strategy_id
             ).with_entities(
-                db.func.max(PerformanceMetric.total_value).label('peak')
+                func.max(PerformanceMetric.total_value).label('peak')
             ).scalar()
             
             if peak:

@@ -10,3 +10,4 @@ export { default as PriceTicker } from './PriceTicker';
 export { default as TradeAnalytics } from './TradeAnalytics';
 export { default as CreateStrategyModal } from './CreateStrategyModal';
 export { default as RiskManagementPanel } from './RiskManagementPanel';
+export { default as StrategyEventLogsModal } from './StrategyEventLogsModal';

@@ -10,6 +10,7 @@ import PriceTicker from './PriceTicker';
 import TradeAnalytics from './TradeAnalytics';
 import CreateStrategyModal, { type CreateStrategyData } from './CreateStrategyModal';
 import RiskManagementPanel from './RiskManagementPanel';
+import StrategyEventLogsModal from './StrategyEventLogsModal';
 import './Dashboard.css';
 import './EnhancedStyles.css';
 
@@ -79,6 +80,9 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showBacktest, setShowBacktest] = useState(false);
   const [showCreateStrategy, setShowCreateStrategy] = useState(false);
+  const [showEventLogs, setShowEventLogs] = useState(false);
+  const [eventLogsStrategyId, setEventLogsStrategyId] = useState<number | null>(null);
+  const [eventLogsStrategyName, setEventLogsStrategyName] = useState<string>('');
   const [activeSymbols] = useState<string[]>(['BTC/USD', 'AAPL', 'TSLA', 'SPY']);
 
   useEffect(() => {
@@ -194,6 +198,12 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const showStrategyLogs = (strategyId: number, strategyName: string) => {
+    setEventLogsStrategyId(strategyId);
+    setEventLogsStrategyName(strategyName);
+    setShowEventLogs(true);
+  };
+
   if (loading) {
     return <div className="loading">Loading DiveTrader...</div>;
   }
@@ -244,6 +254,7 @@ const Dashboard: React.FC = () => {
                   onStart={() => startStrategy(strategy.id)}
                   onStop={() => stopStrategy(strategy.id)}
                   onDelete={() => deleteStrategy(strategy.id)}
+                  onViewLogs={() => showStrategyLogs(strategy.id, strategy.name)}
                 />
               ))
             )}
@@ -338,6 +349,15 @@ const Dashboard: React.FC = () => {
         <CreateStrategyModal
           onClose={() => setShowCreateStrategy(false)}
           onCreate={createStrategy}
+        />
+      )}
+      
+      {showEventLogs && eventLogsStrategyId && (
+        <StrategyEventLogsModal
+          isOpen={showEventLogs}
+          onClose={() => setShowEventLogs(false)}
+          strategyId={eventLogsStrategyId}
+          strategyName={eventLogsStrategyName}
         />
       )}
     </div>

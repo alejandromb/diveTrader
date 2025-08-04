@@ -43,7 +43,10 @@ class BTCScalpingStrategy:
             "use_ai_analysis": True,
             "ai_confidence_threshold": 0.6,
             "combine_ai_with_technical": True,
-            "ai_override_technical": False
+            "ai_override_technical": False,
+            # Paper trading settings
+            "paper_trading_mode": True,  # Skip volume checks in paper trading
+            "fallback_volume": 10000  # Use this volume when real volume is 0
         }
         
         # Load custom config if provided
@@ -275,10 +278,21 @@ class BTCScalpingStrategy:
             latest = bars_data.iloc[-1]
             previous = bars_data.iloc[-2] if len(bars_data) > 1 else latest
             
-            # Check volume
-            if latest['volume'] < self.config["min_volume"]:
-                logger.info(f"  ❌ Volume too low: {latest['volume']:.0f} < {self.config['min_volume']}")
-                return None
+            # Check volume (with paper trading accommodation)
+            actual_volume = latest['volume']
+            effective_volume = actual_volume
+            
+            # Handle paper trading zero volume
+            if self.config.get("paper_trading_mode", False) and actual_volume == 0:
+                effective_volume = self.config.get("fallback_volume", 10000)
+                logger.info(f"  📄 Paper trading mode: Using fallback volume {effective_volume} (actual: {actual_volume})")
+            
+            if effective_volume < self.config["min_volume"]:
+                if actual_volume == 0 and self.config.get("paper_trading_mode", False):
+                    logger.info(f"  ✅ Volume check bypassed in paper trading mode")
+                else:
+                    logger.info(f"  ❌ Volume too low: {effective_volume:.0f} < {self.config['min_volume']}")
+                    return None
             
             # Avoid rapid-fire signals
             current_time = datetime.now()
@@ -307,7 +321,12 @@ class BTCScalpingStrategy:
             logger.info(f"     Long MA ({self.config['long_ma_periods']}): ${current_long_ma:.2f}")
             logger.info(f"     Price > Short MA: {price_above_short} (${current_price:.2f} > ${current_short_ma:.2f})")
             logger.info(f"     Short MA > Long MA: {short_above_long}")
-            logger.info(f"     Volume OK: ✅ ({latest['volume']:.0f} > {self.config['min_volume']})")
+            
+            # Volume status logging
+            if self.config.get("paper_trading_mode", False) and actual_volume == 0:
+                logger.info(f"     Volume OK: ✅ (Paper trading mode - bypassed)")
+            else:
+                logger.info(f"     Volume OK: ✅ ({effective_volume:.0f} > {self.config['min_volume']})")
             
             # Buy signal: short MA crosses above long MA
             if short_above_long and price_above_short:

@@ -212,7 +212,7 @@ const StrategyEventLogsModal: React.FC<StrategyEventLogsModalProps> = ({
 
         <div className="modal-body">
           {viewMode === 'recent' ? (
-            <div className="events-list">
+            <div className={`events-list scrollable-content ${events.length <= 5 ? 'no-scroll' : ''}`}>
               {loading ? (
                 <div className="loading-state">Loading events...</div>
               ) : events.length === 0 ? (
@@ -253,7 +253,7 @@ const StrategyEventLogsModal: React.FC<StrategyEventLogsModalProps> = ({
               )}
             </div>
           ) : (
-            <div className="events-summary">
+            <div className="events-summary scrollable-content">
               {summary ? (
                 <>
                   <div className="summary-stats">

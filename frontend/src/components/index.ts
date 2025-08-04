@@ -8,3 +8,4 @@ export { default as TradesPanel } from './TradesPanel';
 export { default as EnhancedTradesPanel } from './EnhancedTradesPanel';
 export { default as PriceTicker } from './PriceTicker';
 export { default as TradeAnalytics } from './TradeAnalytics';
+export { default as CreateStrategyModal } from './CreateStrategyModal';

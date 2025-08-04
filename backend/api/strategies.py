@@ -239,3 +239,22 @@ async def sync_positions(strategy_id: int, db: Session = Depends(get_db)):
         return {"message": "Positions synced successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{strategy_id}")
+async def delete_strategy(strategy_id: int, db: Session = Depends(get_db)):
+    """Delete a trading strategy"""
+    strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    
+    # Stop strategy if running
+    if strategy.is_active:
+        strategy_runner.stop_strategy(strategy_id)
+    
+    # Delete related records (positions, trades, etc.)
+    # Note: In production, you might want to archive instead of delete
+    strategy_name = strategy.name
+    db.delete(strategy)
+    db.commit()
+    
+    return {"message": f"Strategy '{strategy_name}' deleted successfully"}

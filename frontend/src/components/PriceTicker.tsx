@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
 interface PriceData {
   symbol: string;
@@ -24,14 +25,69 @@ const PriceTicker: React.FC<PriceTickerProps> = ({ symbols, refreshInterval = 30
 
     const fetchPrices = async () => {
       try {
-        // For now, we'll simulate real-time data since Alpaca's real-time requires websockets
-        const mockPrices: PriceData[] = symbols.map(symbol => {
-          const basePrice = symbol === 'BTC/USD' ? 45000 : 
-                           symbol === 'AAPL' ? 175 :
-                           symbol === 'TSLA' ? 250 :
-                           symbol === 'SPY' ? 450 : 100;
+        // Use our backend API to get real Alpaca prices
+        const symbolsString = symbols.join(',');
+        const response = await axios.get(`http://localhost:8000/api/trading/quotes?symbols=${symbolsString}`);
+        const quotesData = response.data;
+        
+        // Store previous prices for change calculation
+        const previousPrices = prices.reduce((acc, price) => {
+          acc[price.symbol] = price.price;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        const newPrices: PriceData[] = symbols.map(symbol => {
+          const quote = quotesData[symbol];
+          if (quote) {
+            const previousPrice = previousPrices[symbol] || quote.price;
+            const change = quote.price - previousPrice;
+            const changePercent = previousPrice > 0 ? (change / previousPrice) * 100 : 0;
+            
+            return {
+              symbol,
+              price: quote.price,
+              change: change,
+              changePercent: changePercent,
+              volume: Math.floor(Math.random() * 1000000), // Volume calculation would need separate API call
+              lastUpdated: quote.timestamp
+            };
+          } else {
+            // Fallback to mock data if symbol not found
+            const basePrice = symbol === 'BTC/USD' ? 75000 : 
+                             symbol === 'AAPL' ? 185 :
+                             symbol === 'TSLA' ? 260 :
+                             symbol === 'SPY' ? 460 : 100;
+            
+            const previousPrice = previousPrices[symbol] || basePrice;
+            const randomChange = (Math.random() - 0.5) * basePrice * 0.01; // ±1% change
+            const currentPrice = basePrice + randomChange;
+            const change = currentPrice - previousPrice;
+            const changePercent = (change / previousPrice) * 100;
+            
+            return {
+              symbol,
+              price: currentPrice,
+              change: change,
+              changePercent: changePercent,
+              volume: Math.floor(Math.random() * 1000000),
+              lastUpdated: new Date().toISOString()
+            };
+          }
+        });
+        
+        setPrices(newPrices);
+        setLastUpdate(new Date());
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching prices from backend:', error);
+        // Fallback to mock data if backend is down
+        const fallbackPrices: PriceData[] = symbols.map(symbol => {
+          const basePrice = symbol === 'BTC/USD' ? 75000 : 
+                           symbol === 'AAPL' ? 185 :
+                           symbol === 'TSLA' ? 260 :
+                           symbol === 'SPY' ? 460 : 100;
           
-          const randomChange = (Math.random() - 0.5) * basePrice * 0.02; // ±2% change
+          const randomChange = (Math.random() - 0.5) * basePrice * 0.01;
           const currentPrice = basePrice + randomChange;
           const changePercent = (randomChange / basePrice) * 100;
           
@@ -39,17 +95,14 @@ const PriceTicker: React.FC<PriceTickerProps> = ({ symbols, refreshInterval = 30
             symbol,
             price: currentPrice,
             change: randomChange,
-            changePercent,
+            changePercent: changePercent,
             volume: Math.floor(Math.random() * 1000000),
             lastUpdated: new Date().toISOString()
           };
         });
         
-        setPrices(mockPrices);
+        setPrices(fallbackPrices);
         setLastUpdate(new Date());
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching prices:', error);
         setLoading(false);
       }
     };

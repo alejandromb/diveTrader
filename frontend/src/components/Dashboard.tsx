@@ -8,6 +8,7 @@ import PositionsPanel from './PositionsPanel';
 import EnhancedTradesPanel from './EnhancedTradesPanel';
 import PriceTicker from './PriceTicker';
 import TradeAnalytics from './TradeAnalytics';
+import CreateStrategyModal, { type CreateStrategyData } from './CreateStrategyModal';
 import './Dashboard.css';
 import './EnhancedStyles.css';
 
@@ -76,6 +77,7 @@ const Dashboard: React.FC = () => {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [showBacktest, setShowBacktest] = useState(false);
+  const [showCreateStrategy, setShowCreateStrategy] = useState(false);
   const [activeSymbols] = useState<string[]>(['BTC/USD', 'AAPL', 'TSLA', 'SPY']);
 
   useEffect(() => {
@@ -169,17 +171,25 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const createStrategy = async () => {
+  const createStrategy = async (strategyData: CreateStrategyData) => {
     try {
-      const newStrategy = {
-        name: `BTC Strategy ${strategies.length + 1}`,
-        strategy_type: 'btc_scalping',
-        initial_capital: 10000.0
-      };
-      const response = await axios.post(`${API_BASE}/strategies/`, newStrategy);
+      const response = await axios.post(`${API_BASE}/strategies/`, strategyData);
       setStrategies([...strategies, response.data]);
+      setShowCreateStrategy(false);
     } catch (error) {
       console.error('Error creating strategy:', error);
+    }
+  };
+
+  const deleteStrategy = async (strategyId: number) => {
+    try {
+      await axios.delete(`${API_BASE}/strategies/${strategyId}`);
+      setStrategies(strategies.filter(s => s.id !== strategyId));
+      if (selectedStrategy === strategyId) {
+        setSelectedStrategy(null);
+      }
+    } catch (error) {
+      console.error('Error deleting strategy:', error);
     }
   };
 
@@ -197,7 +207,7 @@ const Dashboard: React.FC = () => {
       <PriceTicker symbols={activeSymbols} refreshInterval={30000} />
 
       <div className="dashboard-controls">
-        <button onClick={createStrategy} className="btn btn-primary">
+        <button onClick={() => setShowCreateStrategy(true)} className="btn btn-primary">
           + Create Strategy
         </button>
         <button 
@@ -232,6 +242,7 @@ const Dashboard: React.FC = () => {
                   onSelect={() => setSelectedStrategy(strategy.id)}
                   onStart={() => startStrategy(strategy.id)}
                   onStop={() => stopStrategy(strategy.id)}
+                  onDelete={() => deleteStrategy(strategy.id)}
                 />
               ))
             )}
@@ -314,6 +325,13 @@ const Dashboard: React.FC = () => {
         <BacktestModal
           strategyId={selectedStrategy}
           onClose={() => setShowBacktest(false)}
+        />
+      )}
+      
+      {showCreateStrategy && (
+        <CreateStrategyModal
+          onClose={() => setShowCreateStrategy(false)}
+          onCreate={createStrategy}
         />
       )}
     </div>

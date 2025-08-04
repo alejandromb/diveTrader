@@ -16,6 +16,7 @@ interface StrategyCardProps {
   onSelect: () => void;
   onStart: () => void;
   onStop: () => void;
+  onDelete: () => void;
 }
 
 const StrategyCard: React.FC<StrategyCardProps> = ({
@@ -23,7 +24,8 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
   isSelected,
   onSelect,
   onStart,
-  onStop
+  onStop,
+  onDelete
 }) => {
   const getStrategyIcon = (type: string) => {
     switch (type) {
@@ -81,27 +83,44 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
       </div>
 
       <div className="strategy-actions">
-        {strategy.is_active ? (
+        <div className="primary-actions">
+          {strategy.is_active ? (
+            <button 
+              className="btn btn-danger"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStop();
+              }}
+            >
+              Stop Strategy
+            </button>
+          ) : (
+            <button 
+              className="btn btn-success"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStart();
+              }}
+            >
+              Start Strategy
+            </button>
+          )}
+        </div>
+        
+        <div className="secondary-actions">
           <button 
-            className="btn btn-danger"
+            className="btn btn-outline-danger btn-sm"
             onClick={(e) => {
               e.stopPropagation();
-              onStop();
+              if (window.confirm(`Are you sure you want to delete "${strategy.name}"?`)) {
+                onDelete();
+              }
             }}
+            title="Delete Strategy"
           >
-            Stop Strategy
+            🗑️
           </button>
-        ) : (
-          <button 
-            className="btn btn-success"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStart();
-            }}
-          >
-            Start Strategy
-          </button>
-        )}
+        </div>
       </div>
     </div>
   );

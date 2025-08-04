@@ -123,3 +123,12 @@ async def get_market_data(symbol: str, timeframe: str = "1Day", limit: int = 100
         return trading_service.get_market_data(symbol, timeframe, limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/quotes")
+async def get_latest_quotes(symbols: str):
+    """Get latest quotes for multiple symbols (comma-separated)"""
+    try:
+        symbol_list = [s.strip() for s in symbols.split(',')]
+        return trading_service.get_latest_quotes(symbol_list)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

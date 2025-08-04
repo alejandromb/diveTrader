@@ -217,7 +217,7 @@ class StrategySettingsService:
                 "investment_amount": {
                     "value": 1000.0,
                     "type": SettingType.FLOAT,
-                    "description": "Amount to invest in each rebalancing cycle",
+                    "description": "Dollar amount to invest per cycle (e.g., $1000 weekly)",
                     "required": True
                 },
                 "symbols": {
@@ -240,6 +240,12 @@ class StrategySettingsService:
                     "type": SettingType.FLOAT,
                     "description": "Deviation threshold to trigger rebalancing (%)",
                     "required": False
+                },
+                "investment_frequency": {
+                    "value": "weekly",
+                    "type": SettingType.STRING,
+                    "description": "How often to make new investments (weekly, monthly)",
+                    "required": True
                 }
             }
         else:

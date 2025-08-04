@@ -189,6 +189,22 @@ const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
         
       case 'string':
       default:
+        // Special handling for investment_frequency
+        if (key === 'investment_frequency') {
+          return (
+            <select
+              value={currentValue}
+              onChange={(e) => handleSettingChange(key, e.target.value, 'string')}
+              className="form-control"
+            >
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="daily">Daily</option>
+              <option value="biweekly">Bi-weekly</option>
+            </select>
+          );
+        }
+        
         return (
           <input
             type="text"

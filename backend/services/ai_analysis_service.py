@@ -12,9 +12,30 @@ class AIAnalysisService:
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         
+        # TODO: OLLAMA INTEGRATION - Add these environment variables to .env when ready:
+        # OLLAMA_ENABLED=true
+        # OLLAMA_MODEL=llama3.2:3b (or llama3.1:8b, qwen2.5:7b, codellama:7b)
+        # OLLAMA_BASE_URL=http://localhost:11434
+        self.ollama_enabled = os.getenv("OLLAMA_ENABLED", "false").lower() == "true"
+        self.ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        
         # Try to import AI libraries
         try:
-            if self.anthropic_api_key:
+            # TODO: OLLAMA SETUP STEPS:
+            # 1. Install Ollama: curl -fsSL https://ollama.com/install.sh | sh
+            # 2. Download model: ollama pull llama3.2:3b
+            # 3. Install requests: pip install requests
+            # 4. Set OLLAMA_ENABLED=true in .env
+            # 5. Restart backend
+            
+            if self.ollama_enabled:
+                # TODO: Add requests import when Ollama is ready
+                # import requests
+                # self.ollama_client = requests  # Use requests for HTTP calls to Ollama
+                self.ai_provider = "ollama"
+                logger.info(f"Ollama client initialized - Model: {self.ollama_model}")
+            elif self.anthropic_api_key:
                 import anthropic
                 self.anthropic_client = anthropic.Anthropic(api_key=self.anthropic_api_key)
                 self.ai_provider = "anthropic"
@@ -41,6 +62,8 @@ class AIAnalysisService:
                 return self._analyze_with_claude(symbol, price_data, technical_indicators, market_context)
             elif self.ai_provider == "openai":
                 return self._analyze_with_openai(symbol, price_data, technical_indicators, market_context)
+            elif self.ai_provider == "ollama":
+                return self._analyze_with_ollama(symbol, price_data, technical_indicators, market_context)
             else:
                 return self._fallback_analysis(symbol, price_data, technical_indicators)
                 
@@ -184,6 +207,113 @@ class AIAnalysisService:
             
         except Exception as e:
             logger.error(f"OpenAI analysis failed: {e}")
+            return self._fallback_analysis(symbol, price_data, technical_indicators)
+
+    def _analyze_with_ollama(self, symbol: str, price_data: List[Dict], 
+                           technical_indicators: Dict, market_context: Dict) -> Dict:
+        """Use Ollama for market analysis"""
+        try:
+            # TODO: OLLAMA IMPLEMENTATION - Add requests import at top of file when ready
+            # import requests
+            
+            # Prepare market data summary
+            latest_price = price_data[-1]['close'] if price_data else 0
+            price_change = ((price_data[-1]['close'] - price_data[-2]['close']) / price_data[-2]['close'] * 100) if len(price_data) > 1 else 0
+            
+            prompt = f"""
+            You are an expert cryptocurrency trader analyzing {symbol} for a scalping strategy.
+            
+            CURRENT MARKET DATA:
+            - Current Price: ${latest_price:.2f}
+            - Price Change: {price_change:.2f}%
+            - Volume: {price_data[-1]['volume'] if price_data else 0}
+            
+            TECHNICAL INDICATORS:
+            - Short MA (3-period): {technical_indicators.get('short_ma', 'N/A')}
+            - Long MA (5-period): {technical_indicators.get('long_ma', 'N/A')}
+            - RSI: {technical_indicators.get('rsi', 'N/A')}
+            - Bollinger Bands: {technical_indicators.get('bb_upper', 'N/A')} / {technical_indicators.get('bb_lower', 'N/A')}
+            
+            RECENT PRICE ACTION:
+            {self._format_recent_prices(price_data[-10:] if len(price_data) >= 10 else price_data)}
+            
+            ANALYSIS REQUEST:
+            Provide a trading recommendation for a scalping strategy with these criteria:
+            - Time horizon: 1-5 minutes
+            - Risk tolerance: Conservative (0.1% stop loss, 0.2% take profit)
+            - Position size: 0.001 BTC (~$43)
+            
+            Respond with ONLY a JSON object containing:
+            {{
+                "signal": "BUY", "SELL", or "HOLD",
+                "confidence": 0.0-1.0,
+                "reasoning": "Brief explanation of the decision",
+                "risk_assessment": "LOW", "MEDIUM", or "HIGH",
+                "suggested_entry": price_level,
+                "suggested_stop_loss": price_level,
+                "suggested_take_profit": price_level,
+                "time_horizon_minutes": 1-10
+            }}
+            
+            Focus on momentum, volume, and short-term price action for scalping opportunities.
+            """
+            
+            # TODO: OLLAMA HTTP REQUEST - Uncomment when requests is imported
+            # payload = {
+            #     "model": self.ollama_model,
+            #     "prompt": prompt,
+            #     "stream": False,
+            #     "options": {
+            #         "temperature": 0.3,
+            #         "top_p": 0.9,
+            #         "max_tokens": 1000
+            #     }
+            # }
+            # 
+            # response = requests.post(
+            #     f"{self.ollama_base_url}/api/generate",
+            #     json=payload,
+            #     timeout=30
+            # )
+            # response.raise_for_status()
+            # 
+            # response_data = response.json()
+            # response_text = response_data.get("response", "")
+            
+            # TODO: TEMPORARY FALLBACK - Remove when Ollama is implemented
+            logger.warning("Ollama is enabled but not fully implemented - using fallback analysis")
+            return self._fallback_analysis(symbol, price_data, technical_indicators)
+            
+            # TODO: OLLAMA JSON PARSING - Uncomment when HTTP request is implemented
+            # # Parse AI response
+            # try:
+            #     # Find JSON in the response
+            #     json_start = response_text.find('{')
+            #     json_end = response_text.rfind('}') + 1
+            #     if json_start != -1 and json_end != -1:
+            #         json_str = response_text[json_start:json_end]
+            #         ai_analysis = json.loads(json_str)
+            #     else:
+            #         raise ValueError("No JSON found in response")
+            # except (json.JSONDecodeError, ValueError):
+            #     # Fallback if JSON parsing fails
+            #     ai_analysis = {
+            #         "signal": "HOLD",
+            #         "confidence": 0.5,
+            #         "reasoning": "AI response parsing failed, using conservative approach",
+            #         "risk_assessment": "MEDIUM"
+            #     }
+            # 
+            # # Add metadata
+            # ai_analysis["ai_provider"] = "ollama"
+            # ai_analysis["analysis_time"] = datetime.now().isoformat()
+            # ai_analysis["symbol"] = symbol
+            # ai_analysis["model"] = self.ollama_model
+            # 
+            # return ai_analysis
+            
+        except Exception as e:
+            logger.error(f"Ollama analysis failed: {e}")
             return self._fallback_analysis(symbol, price_data, technical_indicators)
 
     def _fallback_analysis(self, symbol: str, price_data: List[Dict], 

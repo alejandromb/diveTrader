@@ -7,7 +7,7 @@ from database.models import Strategy, StrategyType
 from services.trading_service import TradingService
 from services.performance_service import PerformanceService
 from services.strategy_event_logger import strategy_event_logger
-from strategies.btc_scalping_strategy import BTCScalpingStrategy
+from strategies.btc_scalping.btc_scalping_strategy import BTCScalpingStrategy
 import logging
 import os
 from datetime import datetime
@@ -59,6 +59,9 @@ class StrategyRunner:
             self.strategy_instances[strategy_id] = strategy_instance
             
             logger.info(f"Started strategy {strategy.name} (ID: {strategy_id})")
+            # Log strategy start event
+            with SessionLocal() as event_db:
+                strategy_event_logger.log_strategy_start(event_db, strategy_id)
             return True
             
         except Exception as e:
@@ -86,6 +89,10 @@ class StrategyRunner:
             # Clean up
             del self.running_strategies[strategy_id]
             del self.strategy_instances[strategy_id]
+            
+            # Log strategy stop event
+            with SessionLocal() as event_db:
+                strategy_event_logger.log_strategy_stop(event_db, strategy_id)
             
             logger.info(f"Stopped strategy {strategy_id}")
             return True
@@ -143,8 +150,25 @@ class StrategyRunner:
                     # Run strategy iteration
                     if hasattr(strategy_instance, 'run_iteration'):
                         logger.info(f"Running iteration for strategy {strategy_id}")
+                        
+                        # Log trade check event
+                        symbol = "BTC/USD" if strategy.strategy_type == StrategyType.BTC_SCALPING else "PORTFOLIO"
+                        strategy_event_logger.log_trade_check(db, strategy_id, symbol, details={
+                            "iteration_time": datetime.utcnow().isoformat(),
+                            "check_interval": self.check_interval
+                        })
+                        
                         strategy_instance.run_iteration()
                         logger.info(f"Completed iteration for strategy {strategy_id}")
+                        
+                        # Log performance update
+                        metrics = self.performance_service.get_performance_summary(strategy_id, db)
+                        if metrics:
+                            strategy_event_logger.log_performance_update(db, strategy_id, {
+                                "roi": metrics.get("roi_percentage", 0),
+                                "pnl": metrics.get("total_pnl", 0),
+                                "total_trades": metrics.get("total_trades", 0)
+                            })
                         
                     # Update performance metrics
                     self.performance_service.update_daily_performance(strategy_id, db)

@@ -32,8 +32,10 @@ diveTrader/
 ✅ FastAPI backend with Alpaca integration
 ✅ BTC scalping strategy skeleton implemented
 ✅ Environment configuration (.env setup)
+✅ Enhanced frontend trading dashboard with Alpaca data
+✅ Account info, positions, and trades panels
+✅ Development startup scripts
 ⏸️ Portfolio distributor strategy (pending)
-⏸️ Frontend trading dashboard (pending)
 
 ## API Configuration
 - **Endpoint**: https://paper-api.alpaca.markets/v2
@@ -49,9 +51,21 @@ diveTrader/
 6. Prepare for live trading transition
 
 ## Development Commands
-- Frontend: `cd frontend && npm run dev`
-- Backend: `cd backend && python main.py` (after pip install -r requirements.txt)
-- Install backend deps: `cd backend && pip install -r requirements.txt`
+**🚀 Quick Start (Recommended):**
+- Start everything: `npm run dev` or `./start-dev.sh`
+- Windows: `start-dev.bat`
+
+**Individual Commands:**
+- Frontend only: `cd frontend && npm run dev`
+- Backend only: `cd backend && python main.py`
+- Install all deps: `npm run install-all`
+- Build frontend: `npm run build`
+
+**Setup Requirements:**
+1. Backend virtual env: `cd backend && python -m venv venv`
+2. Install backend deps: `source venv/bin/activate && pip install -r requirements.txt`
+3. Create backend/.env with Alpaca API keys
+4. Install frontend deps: `cd frontend && npm install`
 
 ## Repository
 - GitHub: https://github.com/alejandromb/diveTrader

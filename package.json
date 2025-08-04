@@ -1,0 +1,26 @@
+{
+  "name": "divetrader",
+  "version": "1.0.0",
+  "description": "Automated Trading Platform using Alpaca Markets API",
+  "scripts": {
+    "dev": "./start-dev.sh",
+    "start": "./start-dev.sh",
+    "install-all": "cd backend && pip install -r requirements.txt && cd ../frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "test": "cd backend && python -m pytest && cd ../frontend && npm test"
+  },
+  "keywords": [
+    "trading",
+    "alpaca",
+    "bitcoin",
+    "scalping",
+    "portfolio",
+    "automation"
+  ],
+  "author": "DiveTrader Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alejandromb/diveTrader"
+  }
+}

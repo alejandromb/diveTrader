@@ -1,0 +1,273 @@
+.risk-panel {
+  background: #1a1b23;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #2d3748;
+  margin-bottom: 16px;
+}
+
+.risk-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.risk-header h3 {
+  margin: 0;
+  color: #f7fafc;
+  font-size: 1.1rem;
+}
+
+.risk-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.status-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.loading-state {
+  text-align: center;
+  color: #a0aec0;
+  padding: 20px;
+  font-style: italic;
+}
+
+.empty-state {
+  text-align: center;
+  color: #a0aec0;
+  padding: 20px;
+}
+
+.risk-metrics {
+  margin-bottom: 20px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #2d3748;
+}
+
+.metric-row:last-child {
+  border-bottom: none;
+}
+
+.metric-label {
+  color: #a0aec0;
+  font-size: 0.9rem;
+}
+
+.metric-value {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.metric-value.positive {
+  color: #10b981;
+}
+
+.metric-value.negative {
+  color: #ef4444;
+}
+
+.risk-alerts h4 {
+  color: #f7fafc;
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+.no-alerts {
+  text-align: center;
+  color: #10b981;
+  padding: 16px;
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.alerts-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.alert {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  border-left: 4px solid;
+}
+
+.alert-low {
+  background: rgba(16, 185, 129, 0.1);
+  border-left-color: #10b981;
+}
+
+.alert-medium {
+  background: rgba(245, 158, 11, 0.1);
+  border-left-color: #f59e0b;
+}
+
+.alert-high {
+  background: rgba(249, 115, 22, 0.1);
+  border-left-color: #f97316;
+}
+
+.alert-critical {
+  background: rgba(239, 68, 68, 0.1);
+  border-left-color: #ef4444;
+}
+
+.alert-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.alert-icon {
+  font-size: 1rem;
+}
+
+.alert-type {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #e2e8f0;
+}
+
+.alert-time {
+  font-size: 0.7rem;
+  color: #a0aec0;
+  margin-left: auto;
+}
+
+.alert-message {
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Risk Limits Modal */
+.risk-limits-modal {
+  width: 500px;
+  max-width: 90vw;
+}
+
+.limits-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group label {
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.form-group input {
+  padding: 8px 12px;
+  background: #2d3748;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+  color: #f7fafc;
+  font-size: 0.9rem;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #3182ce;
+  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+}
+
+.checkbox-group {
+  grid-column: 1 / -1;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+/* Button styles for risk panel */
+.risk-panel .btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.risk-panel .btn-small {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+}
+
+.risk-panel .btn-primary {
+  background: #3182ce;
+  color: white;
+}
+
+.risk-panel .btn-primary:hover {
+  background: #2c5aa0;
+}
+
+.risk-panel .btn-secondary {
+  background: #4a5568;
+  color: white;
+}
+
+.risk-panel .btn-secondary:hover {
+  background: #2d3748;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .limits-form {
+    grid-template-columns: 1fr;
+  }
+  
+  .risk-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .risk-status {
+    align-self: flex-end;
+  }
+}

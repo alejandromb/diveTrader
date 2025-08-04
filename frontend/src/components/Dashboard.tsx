@@ -9,6 +9,7 @@ import EnhancedTradesPanel from './EnhancedTradesPanel';
 import PriceTicker from './PriceTicker';
 import TradeAnalytics from './TradeAnalytics';
 import CreateStrategyModal, { type CreateStrategyData } from './CreateStrategyModal';
+import RiskManagementPanel from './RiskManagementPanel';
 import './Dashboard.css';
 import './EnhancedStyles.css';
 
@@ -301,6 +302,11 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="right-column">
+          <RiskManagementPanel 
+            strategyId={selectedStrategy}
+            refreshInterval={30000}
+          />
+          
           <PositionsPanel 
             positions={positions} 
             loading={selectedStrategy ? false : true} 

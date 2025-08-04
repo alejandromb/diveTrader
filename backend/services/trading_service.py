@@ -29,9 +29,56 @@ class TradingService:
             secret_key=os.getenv("ALPACA_SECRET_KEY")
         )
 
-    def place_order(self, strategy_id: int, symbol: str, side: OrderSide, quantity: float, db: Session):
-        """Place an order and record it in database"""
+    def get_current_price(self, symbol: str) -> float:
+        """Get current market price for a symbol"""
         try:
+            quotes = self.get_latest_quotes([symbol])
+            if symbol in quotes:
+                return quotes[symbol]['price']
+            else:
+                # Fallback prices
+                fallback_prices = {
+                    'BTC/USD': 75000.0,
+                    'BTCUSD': 75000.0,
+                    'AAPL': 185.0,
+                    'TSLA': 260.0,
+                    'SPY': 460.0,
+                    'MSFT': 350.0
+                }
+                return fallback_prices.get(symbol, 100.0)
+        except Exception as e:
+            logger.error(f"Error getting current price for {symbol}: {e}")
+            return 100.0  # Fallback price
+
+    def place_order(self, strategy_id: int, symbol: str, side: OrderSide, quantity: float, db: Session, 
+                   price: float = None, validate_risk: bool = True):
+        """Place an order with optional risk validation"""
+        try:
+            # Get current market price if not provided
+            if price is None:
+                price = self.get_current_price(symbol)
+            
+            # Risk validation if enabled
+            if validate_risk:
+                from services.risk_management_service import RiskManagementService
+                risk_service = RiskManagementService(self)
+                
+                is_valid, alerts = risk_service.validate_trade(
+                    strategy_id, symbol, side, int(quantity), price, db
+                )
+                
+                if not is_valid:
+                    critical_alerts = [a for a in alerts if a.severity == "critical"]
+                    if critical_alerts:
+                        error_msg = f"Trade blocked by risk management: {critical_alerts[0].message}"
+                        logger.warning(error_msg)
+                        raise ValueError(error_msg)
+                
+                # Log any warnings
+                for alert in alerts:
+                    if alert.severity in ["high", "medium"]:
+                        logger.warning(f"Risk warning: {alert.message}")
+            
             # Create Alpaca order
             order_request = MarketOrderRequest(
                 symbol=symbol,
@@ -49,7 +96,7 @@ class TradingService:
                 symbol=symbol,
                 side=side.value,
                 quantity=quantity,
-                price=0.0,  # Will be updated when filled
+                price=price,
                 status=alpaca_order.status,
                 created_at=datetime.utcnow()
             )
@@ -57,7 +104,7 @@ class TradingService:
             db.add(trade)
             db.commit()
             
-            logger.info(f"Order placed: {symbol} {side.value} {quantity} shares")
+            logger.info(f"Order placed: {symbol} {side.value} {quantity} shares at ${price}")
             return trade
             
         except Exception as e:

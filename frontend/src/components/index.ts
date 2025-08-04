@@ -5,3 +5,6 @@ export { default as BacktestModal } from './BacktestModal';
 export { default as AccountInfo } from './AccountInfo';
 export { default as PositionsPanel } from './PositionsPanel';
 export { default as TradesPanel } from './TradesPanel';
+export { default as EnhancedTradesPanel } from './EnhancedTradesPanel';
+export { default as PriceTicker } from './PriceTicker';
+export { default as TradeAnalytics } from './TradeAnalytics';

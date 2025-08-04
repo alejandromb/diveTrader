@@ -5,8 +5,11 @@ import PerformanceChart from './PerformanceChart';
 import BacktestModal from './BacktestModal';
 import AccountInfo from './AccountInfo';
 import PositionsPanel from './PositionsPanel';
-import TradesPanel from './TradesPanel';
+import EnhancedTradesPanel from './EnhancedTradesPanel';
+import PriceTicker from './PriceTicker';
+import TradeAnalytics from './TradeAnalytics';
 import './Dashboard.css';
+import './EnhancedStyles.css';
 
 interface Strategy {
   id: number;
@@ -73,6 +76,7 @@ const Dashboard: React.FC = () => {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [showBacktest, setShowBacktest] = useState(false);
+  const [activeSymbols] = useState<string[]>(['BTC/USD', 'AAPL', 'TSLA', 'SPY']);
 
   useEffect(() => {
     fetchStrategies();
@@ -190,6 +194,8 @@ const Dashboard: React.FC = () => {
         <p>Automated Trading Platform</p>
       </header>
 
+      <PriceTicker symbols={activeSymbols} refreshInterval={30000} />
+
       <div className="dashboard-controls">
         <button onClick={createStrategy} className="btn btn-primary">
           + Create Strategy
@@ -200,6 +206,12 @@ const Dashboard: React.FC = () => {
           disabled={!selectedStrategy}
         >
           📊 Backtest
+        </button>
+        <button 
+          onClick={() => window.open('http://localhost:8000/docs', '_blank')} 
+          className="btn btn-secondary"
+        >
+          🔧 API Docs
         </button>
       </div>
 
@@ -283,10 +295,18 @@ const Dashboard: React.FC = () => {
             loading={selectedStrategy ? false : true} 
           />
           
-          <TradesPanel 
+          <EnhancedTradesPanel 
             trades={trades} 
             loading={selectedStrategy ? false : true} 
           />
+          
+          {selectedStrategy && (
+            <TradeAnalytics 
+              trades={trades}
+              currentCapital={strategies.find(s => s.id === selectedStrategy)?.current_capital || 0}
+              initialCapital={strategies.find(s => s.id === selectedStrategy)?.initial_capital || 0}
+            />
+          )}
         </div>
       </div>
 

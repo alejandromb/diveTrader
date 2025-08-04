@@ -5,6 +5,7 @@ interface Strategy {
   name: string;
   strategy_type: string;
   is_active: boolean;
+  is_running?: boolean;
   initial_capital: number;
   current_capital: number;
   created_at: string;
@@ -40,8 +41,26 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
     }
   };
 
-  const getStatusColor = (isActive: boolean) => {
-    return isActive ? '#4CAF50' : '#757575';
+  const getStrategyStatus = (strategy: Strategy) => {
+    if (!strategy.is_active) {
+      return {
+        text: '🔴 Disabled',
+        color: '#757575',
+        description: 'Strategy is disabled'
+      };
+    } else if (strategy.is_running) {
+      return {
+        text: '🟢 Running',
+        color: '#4CAF50',
+        description: 'Strategy is active and executing trades'
+      };
+    } else {
+      return {
+        text: '🟡 Enabled but Stopped',
+        color: '#FF9800',
+        description: 'Strategy is enabled but not executing trades'
+      };
+    }
   };
 
   return (
@@ -61,9 +80,10 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
         </div>
         <div 
           className="strategy-status"
-          style={{ color: getStatusColor(strategy.is_active) }}
+          style={{ color: getStrategyStatus(strategy).color }}
+          title={getStrategyStatus(strategy).description}
         >
-          {strategy.is_active ? '🟢 Active' : '🔴 Inactive'}
+          {getStrategyStatus(strategy).text}
         </div>
       </div>
 
@@ -86,7 +106,7 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
 
       <div className="strategy-actions">
         <div className="primary-actions">
-          {strategy.is_active ? (
+          {strategy.is_running ? (
             <button 
               className="btn btn-danger"
               onClick={(e) => {
@@ -103,6 +123,8 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
                 e.stopPropagation();
                 onStart();
               }}
+              disabled={!strategy.is_active}
+              title={!strategy.is_active ? "Strategy must be enabled first" : "Start executing trades"}
             >
               Start Strategy
             </button>

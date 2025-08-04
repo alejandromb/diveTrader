@@ -19,6 +19,7 @@ interface Strategy {
   name: string;
   strategy_type: string;
   is_active: boolean;
+  is_running?: boolean;
   initial_capital: number;
   current_capital: number;
   created_at: string;
@@ -102,9 +103,30 @@ const Dashboard: React.FC = () => {
   const fetchStrategies = async () => {
     try {
       const response = await axios.get(`${API_BASE}/strategies/`);
-      setStrategies(response.data);
-      if (response.data.length > 0 && !selectedStrategy) {
-        setSelectedStrategy(response.data[0].id);
+      const strategiesData = response.data;
+      
+      // Fetch detailed status for each strategy to get runtime info
+      const strategiesWithStatus = await Promise.all(
+        strategiesData.map(async (strategy: Strategy) => {
+          try {
+            const statusResponse = await axios.get(`${API_BASE}/strategies/${strategy.id}/status`);
+            return {
+              ...strategy,
+              is_running: statusResponse.data.is_running
+            };
+          } catch (error) {
+            console.error(`Error fetching status for strategy ${strategy.id}:`, error);
+            return {
+              ...strategy,
+              is_running: false
+            };
+          }
+        })
+      );
+      
+      setStrategies(strategiesWithStatus);
+      if (strategiesWithStatus.length > 0 && !selectedStrategy) {
+        setSelectedStrategy(strategiesWithStatus[0].id);
       }
       setLoading(false);
     } catch (error) {

@@ -21,7 +21,11 @@ class StrategyRunner:
         self.strategy_instances: Dict[int, object] = {}
         self.trading_service = TradingService()
         self.performance_service = PerformanceService()
-        self.check_interval = int(os.getenv("STRATEGY_CHECK_INTERVAL", 60))
+        # Different check intervals for different strategy types
+        self.check_intervals = {
+            StrategyType.BTC_SCALPING: int(os.getenv("BTC_SCALPING_INTERVAL", 60)),  # 1 minute for scalping
+            StrategyType.PORTFOLIO_DISTRIBUTOR: int(os.getenv("PORTFOLIO_INTERVAL", 3600))  # 1 hour for portfolio
+        }
         self._shutdown = False
         
     def start_strategy(self, strategy_id: int) -> bool:
@@ -53,7 +57,7 @@ class StrategyRunner:
             # Start strategy in separate thread
             thread = threading.Thread(
                 target=self._run_strategy,
-                args=(strategy_id, strategy_instance),
+                args=(strategy_id, strategy_instance, strategy.strategy_type),
                 daemon=True,
                 name=f"Strategy-{strategy_id}"
             )
@@ -139,9 +143,10 @@ class StrategyRunner:
             logger.error(f"Error creating strategy instance: {e}")
             return None
             
-    def _run_strategy(self, strategy_id: int, strategy_instance):
+    def _run_strategy(self, strategy_id: int, strategy_instance, strategy_type: StrategyType):
         """Run strategy in a loop"""
-        logger.info(f"Strategy {strategy_id} thread started")
+        check_interval = self.check_intervals.get(strategy_type, 60)
+        logger.info(f"Strategy {strategy_id} thread started (interval: {check_interval}s)")
         
         while not self._shutdown and strategy_id in self.running_strategies:
             try:
@@ -167,7 +172,7 @@ class StrategyRunner:
                         symbol = "BTC/USD" if strategy.strategy_type == StrategyType.BTC_SCALPING else "PORTFOLIO"
                         strategy_event_logger.log_trade_check(db, strategy_id, symbol, details={
                             "iteration_time": datetime.utcnow().isoformat(),
-                            "check_interval": self.check_interval
+                            "check_interval": check_interval
                         })
                         
                         strategy_instance.run_iteration()
@@ -196,12 +201,12 @@ class StrategyRunner:
                 
                 # Wait before next iteration
                 import time
-                time.sleep(self.check_interval)
+                time.sleep(check_interval)
                 
             except Exception as e:
                 logger.error(f"Error in strategy {strategy_id} loop: {e}")
                 import time
-                time.sleep(self.check_interval)
+                time.sleep(check_interval)
                 
         logger.info(f"Strategy {strategy_id} thread stopped")
         

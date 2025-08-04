@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from services.trading_service import TradingService
 from services.performance_service import PerformanceService
 from services.ai_analysis_service import AIAnalysisService
+from strategies.base_strategy import BaseStrategy
+from services.strategy_settings_service import SettingType
 from alpaca.trading.enums import OrderSide
 from alpaca.data.requests import CryptoBarsRequest
 from alpaca.data.timeframe import TimeFrame
@@ -17,45 +19,21 @@ from typing import Dict
 
 logger = logging.getLogger(__name__)
 
-class BTCScalpingStrategy:
+class BTCScalpingStrategy(BaseStrategy):
     def __init__(self, strategy_id: int, trading_service: TradingService, 
                  performance_service: PerformanceService, db_session: Session, 
                  config: str = None):
-        self.strategy_id = strategy_id
+        super().__init__(strategy_id, db_session)
         self.trading_service = trading_service
         self.performance_service = performance_service
-        self.db_session = db_session
         self.ai_analysis_service = AIAnalysisService()
         self.symbol = "BTC/USD"
         self.is_running = False
         
-        # Default configuration
-        self.config = {
-            "position_size": 0.001,  # BTC amount per trade
-            "take_profit_pct": 0.002,  # 0.2%
-            "stop_loss_pct": 0.001,   # 0.1%
-            "lookback_periods": 10,
-            "short_ma_periods": 3,
-            "long_ma_periods": 5,
-            "min_volume": 1000,
-            "max_positions": 1,
-            # AI-enhanced settings
-            "use_ai_analysis": True,
-            "ai_confidence_threshold": 0.6,
-            "combine_ai_with_technical": True,
-            "ai_override_technical": False,
-            # Paper trading settings
-            "paper_trading_mode": True,  # Skip volume checks in paper trading
-            "fallback_volume": 10000  # Use this volume when real volume is 0
-        }
-        
-        # Load custom config if provided
-        if config:
-            try:
-                custom_config = json.loads(config) if isinstance(config, str) else config
-                self.config.update(custom_config)
-            except Exception as e:
-                logger.warning(f"Error loading config: {e}, using defaults")
+        # Initialize default settings if not already present
+        if not self.get_setting("position_size"):
+            self.initialize_default_settings("btc_scalping")
+            logger.info("Initialized default settings for BTC scalping strategy")
                 
         self.current_position = None
         self.last_signal_time = None
@@ -74,22 +52,36 @@ class BTCScalpingStrategy:
         
         logger.info(f"BTC Scalping Strategy initialized for strategy {strategy_id}")
         
-    def start(self):
+    def start(self) -> bool:
         """Start the strategy"""
-        self.is_running = True
-        logger.info(f"BTC Scalping Strategy {self.strategy_id} started")
+        try:
+            if not self.validate_settings():
+                logger.error(f"Strategy {self.strategy_id} has invalid settings")
+                return False
+                
+            self.is_running = True
+            logger.info(f"BTC Scalping Strategy {self.strategy_id} started")
+            return True
+        except Exception as e:
+            logger.error(f"Error starting strategy {self.strategy_id}: {e}")
+            return False
         
-    def stop(self):
+    def stop(self) -> bool:
         """Stop the strategy"""
-        self.is_running = False
-        logger.info(f"BTC Scalping Strategy {self.strategy_id} stopped")
-        
-        # Close any open positions
-        if self.current_position:
-            try:
-                self._exit_position("strategy_stop")
-            except Exception as e:
-                logger.error(f"Error closing position on stop: {e}")
+        try:
+            self.is_running = False
+            logger.info(f"BTC Scalping Strategy {self.strategy_id} stopped")
+            
+            # Close any open positions
+            if self.current_position:
+                try:
+                    self._exit_position("strategy_stop")
+                except Exception as e:
+                    logger.error(f"Error closing position on stop: {e}")
+            return True
+        except Exception as e:
+            logger.error(f"Error stopping strategy {self.strategy_id}: {e}")
+            return False
                 
     def run_iteration(self):
         """Run one iteration of the strategy"""
@@ -99,8 +91,9 @@ class BTCScalpingStrategy:
         try:
             # Get current market data
             bars_data = self._get_recent_bars()
-            if bars_data is None or len(bars_data) < self.config["lookback_periods"]:
-                logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] ASSESSMENT: Insufficient data for analysis (got {len(bars_data) if bars_data is not None else 0} bars, need {self.config['lookback_periods']})")
+            lookback_periods = self.get_int_setting("lookback_periods", 10)
+            if bars_data is None or len(bars_data) < lookback_periods:
+                logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] ASSESSMENT: Insufficient data for analysis (got {len(bars_data) if bars_data is not None else 0} bars, need {lookback_periods})")
                 return
                 
             # Get current price for logging
@@ -209,7 +202,8 @@ class BTCScalpingStrategy:
     def _analyze_market(self, bars_data: pd.DataFrame) -> str:
         """AI-enhanced market analysis and signal generation"""
         try:
-            if len(bars_data) < self.config["long_ma_periods"]:
+            long_ma_periods = self.get_int_setting("long_ma_periods", 5)
+            if len(bars_data) < long_ma_periods:
                 return None
             
             # Convert DataFrame to list format for AI service
@@ -231,7 +225,7 @@ class BTCScalpingStrategy:
             traditional_signal = self._get_traditional_signal(bars_data, technical_indicators)
             
             # Get AI analysis if enabled
-            if self.config.get("use_ai_analysis", True):
+            if self.get_bool_setting("use_ai_analysis", True):
                 try:
                     ai_analysis = self.ai_analysis_service.analyze_market_data(
                         symbol=self.symbol,
@@ -266,12 +260,14 @@ class BTCScalpingStrategy:
     def _get_traditional_signal(self, bars_data: pd.DataFrame, technical_indicators: Dict) -> str:
         """Traditional technical analysis signal"""
         try:
-            # Calculate moving averages
+            # Calculate moving averages using settings
+            short_ma_periods = self.get_int_setting("short_ma_periods", 3)
+            long_ma_periods = self.get_int_setting("long_ma_periods", 5)
             bars_data['short_ma'] = bars_data['close'].rolling(
-                window=self.config["short_ma_periods"]
+                window=short_ma_periods
             ).mean()
             bars_data['long_ma'] = bars_data['close'].rolling(
-                window=self.config["long_ma_periods"]
+                window=long_ma_periods
             ).mean()
             
             # Get latest values
@@ -282,16 +278,20 @@ class BTCScalpingStrategy:
             actual_volume = latest['volume']
             effective_volume = actual_volume
             
-            # Handle paper trading zero volume
-            if self.config.get("paper_trading_mode", False) and actual_volume == 0:
-                effective_volume = self.config.get("fallback_volume", 10000)
+            # Handle paper trading zero volume using settings
+            paper_trading_mode = self.get_bool_setting("paper_trading_mode", True)
+            fallback_volume = self.get_int_setting("fallback_volume", 10000)
+            min_volume = self.get_int_setting("min_volume", 1000)
+            
+            if paper_trading_mode and actual_volume == 0:
+                effective_volume = fallback_volume
                 logger.info(f"  📄 Paper trading mode: Using fallback volume {effective_volume} (actual: {actual_volume})")
             
-            if effective_volume < self.config["min_volume"]:
-                if actual_volume == 0 and self.config.get("paper_trading_mode", False):
+            if effective_volume < min_volume:
+                if actual_volume == 0 and paper_trading_mode:
                     logger.info(f"  ✅ Volume check bypassed in paper trading mode")
                 else:
-                    logger.info(f"  ❌ Volume too low: {effective_volume:.0f} < {self.config['min_volume']}")
+                    logger.info(f"  ❌ Volume too low: {effective_volume:.0f} < {min_volume}")
                     return None
             
             # Avoid rapid-fire signals
@@ -317,16 +317,16 @@ class BTCScalpingStrategy:
             price_above_short = current_price > current_short_ma
             
             logger.info(f"  📊 Technical Analysis:")
-            logger.info(f"     Short MA ({self.config['short_ma_periods']}): ${current_short_ma:.2f}")
-            logger.info(f"     Long MA ({self.config['long_ma_periods']}): ${current_long_ma:.2f}")
+            logger.info(f"     Short MA ({short_ma_periods}): ${current_short_ma:.2f}")
+            logger.info(f"     Long MA ({long_ma_periods}): ${current_long_ma:.2f}")
             logger.info(f"     Price > Short MA: {price_above_short} (${current_price:.2f} > ${current_short_ma:.2f})")
             logger.info(f"     Short MA > Long MA: {short_above_long}")
             
             # Volume status logging
-            if self.config.get("paper_trading_mode", False) and actual_volume == 0:
+            if paper_trading_mode and actual_volume == 0:
                 logger.info(f"     Volume OK: ✅ (Paper trading mode - bypassed)")
             else:
-                logger.info(f"     Volume OK: ✅ ({effective_volume:.0f} > {self.config['min_volume']})")
+                logger.info(f"     Volume OK: ✅ ({effective_volume:.0f} > {min_volume})")
             
             # Buy signal: short MA crosses above long MA
             if short_above_long and price_above_short:
@@ -345,17 +345,20 @@ class BTCScalpingStrategy:
         """Combine traditional and AI signals intelligently"""
         try:
             # If AI confidence is low, rely on traditional
-            if ai_confidence < self.config.get("ai_confidence_threshold", 0.6):
+            ai_confidence_threshold = self.get_float_setting("ai_confidence_threshold", 0.6)
+            if ai_confidence < ai_confidence_threshold:
                 logger.info(f"AI confidence too low ({ai_confidence:.2f}), using traditional signal: {traditional_signal}")
                 return traditional_signal
             
             # If AI override is enabled and AI is confident
-            if self.config.get("ai_override_technical", False) and ai_confidence > 0.8:
+            ai_override_technical = self.get_bool_setting("ai_override_technical", False)
+            if ai_override_technical and ai_confidence > 0.8:
                 logger.info(f"AI override enabled, using AI signal: {ai_signal}")
                 return ai_signal
             
             # Combine signals - both must agree for BUY
-            if self.config.get("combine_ai_with_technical", True):
+            combine_ai_with_technical = self.get_bool_setting("combine_ai_with_technical", True)
+            if combine_ai_with_technical:
                 if traditional_signal == "BUY" and ai_signal == "BUY":
                     logger.info("Both AI and traditional analysis agree on BUY")
                     return "BUY"
@@ -385,7 +388,8 @@ class BTCScalpingStrategy:
                 return
                 
             # Check max positions limit
-            if self._count_open_positions() >= self.config["max_positions"]:
+            max_positions = self.get_int_setting("max_positions", 1)
+            if self._count_open_positions() >= max_positions:
                 logger.debug("Maximum positions reached, skipping signal")
                 return
                 
@@ -399,28 +403,32 @@ class BTCScalpingStrategy:
         """Enter a new position"""
         try:
             # Place order through trading service
+            position_size = self.get_float_setting("position_size", 0.001)
             order_side = OrderSide.BUY if side == "buy" else OrderSide.SELL
             trade = self.trading_service.place_order(
                 strategy_id=self.strategy_id,
                 symbol=self.symbol,
                 side=order_side,
-                quantity=self.config["position_size"],
+                quantity=position_size,
                 db=self.db_session
             )
             
             if trade:
+                take_profit_pct = self.get_float_setting("take_profit_pct", 0.002)
+                stop_loss_pct = self.get_float_setting("stop_loss_pct", 0.001)
+                
                 self.current_position = {
                     'trade_id': trade.id,
                     'side': side,
                     'entry_price': price,
-                    'quantity': self.config["position_size"],
+                    'quantity': position_size,
                     'timestamp': datetime.now(),
-                    'take_profit_price': price * (1 + self.config["take_profit_pct"]) if side == "buy" else price * (1 - self.config["take_profit_pct"]),
-                    'stop_loss_price': price * (1 - self.config["stop_loss_pct"]) if side == "buy" else price * (1 + self.config["stop_loss_pct"])
+                    'take_profit_price': price * (1 + take_profit_pct) if side == "buy" else price * (1 - take_profit_pct),
+                    'stop_loss_price': price * (1 - stop_loss_pct) if side == "buy" else price * (1 + stop_loss_pct)
                 }
                 
                 self.last_signal_time = datetime.now()
-                logger.info(f"Entered {side} position: {self.config['position_size']} {self.symbol} at ${price:.2f}")
+                logger.info(f"Entered {side} position: {position_size} {self.symbol} at ${price:.2f}")
                 
         except Exception as e:
             logger.error(f"Error entering position: {e}")
@@ -510,9 +518,9 @@ class BTCScalpingStrategy:
             "is_running": self.is_running,
             "symbol": self.symbol,
             "has_position": self.current_position is not None,
-            "config": self.config,
+            "settings": self.get_all_settings(),
             "last_signal_time": self.last_signal_time.isoformat() if self.last_signal_time else None,
-            "ai_enabled": self.config.get("use_ai_analysis", True),
+            "ai_enabled": self.get_bool_setting("use_ai_analysis", True),
             "ai_provider": getattr(self.ai_analysis_service, 'ai_provider', 'fallback')
         }
         
@@ -527,3 +535,34 @@ class BTCScalpingStrategy:
             }
         
         return status
+    
+    def validate_settings(self) -> bool:
+        """Validate strategy settings"""
+        try:
+            # Check required settings exist and are valid
+            position_size = self.get_float_setting("position_size", 0.001)
+            if position_size <= 0:
+                logger.error(f"Invalid position_size: {position_size}")
+                return False
+                
+            take_profit_pct = self.get_float_setting("take_profit_pct", 0.002)
+            if take_profit_pct <= 0:
+                logger.error(f"Invalid take_profit_pct: {take_profit_pct}")
+                return False
+                
+            stop_loss_pct = self.get_float_setting("stop_loss_pct", 0.001)
+            if stop_loss_pct <= 0:
+                logger.error(f"Invalid stop_loss_pct: {stop_loss_pct}")
+                return False
+                
+            # Validate MA periods
+            short_ma = self.get_int_setting("short_ma_periods", 3)
+            long_ma = self.get_int_setting("long_ma_periods", 5)
+            if short_ma <= 0 or long_ma <= 0 or short_ma >= long_ma:
+                logger.error(f"Invalid MA periods: short={short_ma}, long={long_ma}")
+                return False
+                
+            return True
+        except Exception as e:
+            logger.error(f"Error validating settings: {e}")
+            return False

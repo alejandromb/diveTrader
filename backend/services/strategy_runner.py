@@ -126,14 +126,16 @@ class StrategyRunner:
                 return strategy_instance
             elif strategy.strategy_type == StrategyType.PORTFOLIO_DISTRIBUTOR:
                 strategy_instance = PortfolioDistributorStrategy(
-                    trading_service=self.trading_service
+                    strategy_id=strategy.id,
+                    trading_service=self.trading_service,
+                    db_session=db
                 )
-                # Initialize the strategy
-                if strategy_instance.initialize_strategy(strategy, db):
+                # Start the strategy instance
+                if strategy_instance.start():
                     logger.info(f"Portfolio distributor strategy instance created: {strategy_instance}")
                     return strategy_instance
                 else:
-                    logger.error(f"Failed to initialize portfolio distributor strategy {strategy.id}")
+                    logger.error(f"Failed to start portfolio distributor strategy {strategy.id}")
                     return None
             else:
                 logger.error(f"Unknown strategy type: {strategy.strategy_type}")

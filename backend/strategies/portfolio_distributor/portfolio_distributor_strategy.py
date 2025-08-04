@@ -5,46 +5,93 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 from database.models import Strategy, Position, Trade, Portfolio
 from services.trading_service import TradingService
+from strategies.base_strategy import BaseStrategy
+from services.strategy_settings_service import SettingType
 from alpaca.trading.enums import OrderSide
 from config.constants import DEFAULT_PORTFOLIO_SYMBOLS, DEFAULT_PORTFOLIO_WEIGHTS
 
 logger = logging.getLogger(__name__)
 
-class PortfolioDistributorStrategy:
-    def __init__(self, trading_service: TradingService):
+class PortfolioDistributorStrategy(BaseStrategy):
+    def __init__(self, strategy_id: int, trading_service: TradingService, db_session: Session):
+        super().__init__(strategy_id, db_session)
         self.trading_service = trading_service
         self.logger = logging.getLogger(__name__)
-        self.db_session = None  # Will be set by strategy runner
-        self.strategy_id = None  # Will be set during initialization
+        self.is_running = False
         
-    def initialize_strategy(self, strategy: Strategy, db: Session) -> bool:
-        """Initialize portfolio distributor strategy"""
+        # Initialize default settings if not already present
+        if not self.get_setting("investment_amount"):
+            self.initialize_default_settings("portfolio_distributor")
+            logger.info("Initialized default settings for portfolio distributor strategy")
+        
+    def start(self) -> bool:
+        """Start the strategy"""
         try:
-            self.strategy_id = strategy.id  # Store strategy ID
-            config = json.loads(strategy.config or '{}')
-            portfolio_config = config.get('portfolio_distributor', {})
+            if not self.validate_settings():
+                logger.error(f"Strategy {self.strategy_id} has invalid settings")
+                return False
+                
+            # Create or update portfolio record
+            self._create_portfolio_record()
             
-            # Create portfolio record
-            portfolio = Portfolio(
-                strategy_id=strategy.id,
-                name=f"{strategy.name} Portfolio",
-                symbols=json.dumps(portfolio_config.get('symbols', DEFAULT_PORTFOLIO_SYMBOLS)),
-                allocation_weights=json.dumps(portfolio_config.get('allocation_weights', DEFAULT_PORTFOLIO_WEIGHTS)),
-                investment_frequency=portfolio_config.get('investment_frequency', 'weekly'),
-                investment_amount=portfolio_config.get('investment_amount', 1000),
-                next_investment_date=self._calculate_next_investment_date(
-                    portfolio_config.get('investment_frequency', 'weekly')
+            self.is_running = True
+            logger.info(f"Portfolio Distributor Strategy {self.strategy_id} started")
+            return True
+        except Exception as e:
+            logger.error(f"Error starting strategy {self.strategy_id}: {e}")
+            return False
+    
+    def stop(self) -> bool:
+        """Stop the strategy"""
+        try:
+            self.is_running = False
+            logger.info(f"Portfolio Distributor Strategy {self.strategy_id} stopped")
+            return True
+        except Exception as e:
+            logger.error(f"Error stopping strategy {self.strategy_id}: {e}")
+            return False
+    
+    def _create_portfolio_record(self) -> bool:
+        """Create or update portfolio record using settings"""
+        try:
+            strategy = self.db_session.query(Strategy).filter(Strategy.id == self.strategy_id).first()
+            if not strategy:
+                return False
+                
+            # Check if portfolio already exists
+            portfolio = self.db_session.query(Portfolio).filter(
+                Portfolio.strategy_id == self.strategy_id
+            ).first()
+            
+            symbols = self.get_list_setting("symbols", DEFAULT_PORTFOLIO_SYMBOLS)
+            weights = self.get_dict_setting("weights", DEFAULT_PORTFOLIO_WEIGHTS)
+            investment_amount = self.get_float_setting("investment_amount", 1000.0)
+            investment_frequency = "weekly"  # Fixed for now
+            
+            if portfolio:
+                # Update existing portfolio
+                portfolio.symbols = json.dumps(symbols)
+                portfolio.allocation_weights = json.dumps(weights)
+                portfolio.investment_amount = investment_amount
+            else:
+                # Create new portfolio
+                portfolio = Portfolio(
+                    strategy_id=self.strategy_id,
+                    name=f"{strategy.name} Portfolio",
+                    symbols=json.dumps(symbols),
+                    allocation_weights=json.dumps(weights),
+                    investment_frequency=investment_frequency,
+                    investment_amount=investment_amount,
+                    next_investment_date=self._calculate_next_investment_date(investment_frequency)
                 )
-            )
+                self.db_session.add(portfolio)
             
-            db.add(portfolio)
-            db.commit()
-            
-            self.logger.info(f"Initialized portfolio distributor strategy {strategy.id}")
+            self.db_session.commit()
+            logger.info(f"Portfolio record created/updated for strategy {self.strategy_id}")
             return True
             
         except Exception as e:
-            self.logger.error(f"Error initializing portfolio distributor: {e}")
+            logger.error(f"Error creating portfolio record: {e}")
             return False
     
     def _calculate_next_investment_date(self, frequency: str) -> datetime:
@@ -68,6 +115,12 @@ class PortfolioDistributorStrategy:
         else:
             # Default to weekly
             return now + timedelta(days=7)
+    
+    def initialize_strategy(self, strategy: Strategy, db: Session) -> bool:
+        """Legacy method for compatibility with strategy runner"""
+        # This method is kept for compatibility but the actual initialization
+        # is now done in __init__ and start() methods
+        return True
     
     def should_invest_today(self, strategy_id: int, db: Session) -> bool:
         """Check if we should make an investment today"""
@@ -105,8 +158,9 @@ class PortfolioDistributorStrategy:
             symbols = json.loads(portfolio.symbols)
             allocation_weights = json.loads(portfolio.allocation_weights)
             
-            # Calculate investment amounts per symbol
-            total_investment = min(portfolio.investment_amount, strategy.current_capital)
+            # Calculate investment amounts per symbol using settings
+            investment_amount = self.get_float_setting("investment_amount", 1000.0)
+            total_investment = min(investment_amount, strategy.current_capital)
             
             if total_investment < 10:  # Minimum investment
                 self.logger.warning(f"Insufficient capital for investment: ${total_investment}")
@@ -196,9 +250,9 @@ class PortfolioDistributorStrategy:
             for pos in positions:
                 current_allocations[pos.symbol] = (pos.market_value / total_value) * 100
             
-            # Compare with target allocations
-            target_allocations = json.loads(portfolio.allocation_weights)
-            rebalance_threshold = 5.0  # Default 5% threshold
+            # Compare with target allocations using settings
+            target_allocations = self.get_dict_setting("weights", {})
+            rebalance_threshold = self.get_float_setting("rebalance_threshold", 5.0)
             
             # Check if any allocation is off by more than threshold
             for symbol, target_weight in target_allocations.items():
@@ -256,8 +310,7 @@ class PortfolioDistributorStrategy:
     
     def run_iteration(self):
         """Single iteration of the strategy - called by strategy runner"""
-        if not self.strategy_id or not self.db_session:
-            self.logger.error("Strategy not properly initialized")
+        if not self.is_running:
             return
             
         try:
@@ -267,3 +320,33 @@ class PortfolioDistributorStrategy:
         except Exception as e:
             self.logger.error(f"Error in portfolio distributor iteration: {e}")
             return None
+    
+    def validate_settings(self) -> bool:
+        """Validate strategy settings"""
+        try:
+            # Check required settings exist and are valid
+            investment_amount = self.get_float_setting("investment_amount", 1000.0)
+            if investment_amount <= 0:
+                logger.error(f"Invalid investment_amount: {investment_amount}")
+                return False
+                
+            symbols = self.get_list_setting("symbols", [])
+            if not symbols or len(symbols) == 0:
+                logger.error("No symbols configured for portfolio")
+                return False
+                
+            weights = self.get_dict_setting("weights", {})
+            if not weights:
+                logger.error("No allocation weights configured")
+                return False
+                
+            # Check that weights sum to approximately 100%
+            total_weight = sum(weights.values())
+            if abs(total_weight - 100.0) > 1.0:  # Allow 1% tolerance
+                logger.error(f"Allocation weights sum to {total_weight}%, should be 100%")
+                return False
+                
+            return True
+        except Exception as e:
+            logger.error(f"Error validating settings: {e}")
+            return False

@@ -34,6 +34,7 @@ class Strategy(Base):
     trades = relationship("Trade", back_populates="strategy")
     performance_metrics = relationship("PerformanceMetric", back_populates="strategy")
     event_logs = relationship("StrategyEventLog", back_populates="strategy")
+    settings = relationship("StrategySetting", back_populates="strategy")
 
 class Position(Base):
     __tablename__ = "positions"
@@ -114,6 +115,30 @@ class EventLogLevel(enum.Enum):
     WARN = "warn"
     ERROR = "error"
     CRITICAL = "critical"
+
+class SettingType(enum.Enum):
+    INTEGER = "integer"
+    FLOAT = "float"
+    STRING = "string"
+    BOOLEAN = "boolean"
+    JSON = "json"
+
+class StrategySetting(Base):
+    __tablename__ = "strategy_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    strategy_id = Column(Integer, ForeignKey("strategies.id"))
+    setting_key = Column(String(50), index=True)
+    setting_value = Column(Text)
+    setting_type = Column(Enum(SettingType))
+    description = Column(String(200))
+    default_value = Column(Text)
+    is_required = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    strategy = relationship("Strategy", back_populates="settings")
 
 class StrategyEventLog(Base):
     __tablename__ = "strategy_event_logs"

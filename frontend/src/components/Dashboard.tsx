@@ -12,6 +12,7 @@ import TradeAnalytics from './TradeAnalytics';
 import CreateStrategyModal, { type CreateStrategyData } from './CreateStrategyModal';
 import RiskManagementPanel from './RiskManagementPanel';
 import StrategyEventLogsModal from './StrategyEventLogsModal';
+import StrategySettingsModal from './StrategySettingsModal';
 import './Dashboard.css';
 import './EnhancedStyles.css';
 
@@ -86,6 +87,9 @@ const Dashboard: React.FC = () => {
   const [showEventLogs, setShowEventLogs] = useState(false);
   const [eventLogsStrategyId, setEventLogsStrategyId] = useState<number | null>(null);
   const [eventLogsStrategyName, setEventLogsStrategyName] = useState<string>('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsStrategyId, setSettingsStrategyId] = useState<number | null>(null);
+  const [settingsStrategyName, setSettingsStrategyName] = useState<string>('');
   const [activeSymbols] = useState<string[]>(['BTC/USD', 'AAPL', 'TSLA', 'SPY']);
 
   useEffect(() => {
@@ -230,6 +234,12 @@ const Dashboard: React.FC = () => {
     setShowEventLogs(true);
   };
 
+  const showStrategySettings = (strategyId: number, strategyName: string) => {
+    setSettingsStrategyId(strategyId);
+    setSettingsStrategyName(strategyName);
+    setShowSettings(true);
+  };
+
   if (loading) {
     return <div className="loading">Loading DiveTrader...</div>;
   }
@@ -281,6 +291,7 @@ const Dashboard: React.FC = () => {
                   onStop={() => stopStrategy(strategy.id)}
                   onDelete={() => deleteStrategy(strategy.id)}
                   onViewLogs={() => showStrategyLogs(strategy.id, strategy.name)}
+                  onViewSettings={() => showStrategySettings(strategy.id, strategy.name)}
                 />
               ))
             )}
@@ -384,6 +395,15 @@ const Dashboard: React.FC = () => {
           onClose={() => setShowEventLogs(false)}
           strategyId={eventLogsStrategyId}
           strategyName={eventLogsStrategyName}
+        />
+      )}
+
+      {showSettings && settingsStrategyId && (
+        <StrategySettingsModal
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+          strategyId={settingsStrategyId}
+          strategyName={settingsStrategyName}
         />
       )}
     </div>

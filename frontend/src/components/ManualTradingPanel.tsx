@@ -85,6 +85,7 @@ const ManualTradingPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null); // Error state for dialog
   const [accountData, setAccountData] = useState<any>(null);
 
   useEffect(() => {
@@ -142,10 +143,16 @@ const ManualTradingPanel: React.FC = () => {
 
   const openOrderDialog = (type: 'buy' | 'sell') => {
     setOrderType(type);
+    setDialogError(null); // Clear any previous dialog errors
     
     // Get current position for this stock (for sell validation)
     const currentPosition = positions.find(p => p.symbol === selectedStock?.symbol);
     const maxSellQuantity = currentPosition ? Math.abs(currentPosition.quantity) : 0;
+    
+    // For sell orders, validate that user has shares
+    if (type === 'sell' && maxSellQuantity === 0) {
+      setDialogError(`You don't own any shares of ${selectedStock?.symbol} to sell.`);
+    }
     
     setOrderDetails({
       quantity: type === 'sell' ? Math.min(1, maxSellQuantity) : 1,
@@ -162,7 +169,7 @@ const ManualTradingPanel: React.FC = () => {
     if (!selectedStock) return;
 
     setLoading(true);
-    setError(null);
+    setDialogError(null); // Clear dialog errors, not main errors
     setSuccess(null);
 
     // Determine quantity based on buy mode
@@ -195,7 +202,7 @@ const ManualTradingPanel: React.FC = () => {
       fetchPositions(); // Refresh positions
       fetchAccountData(); // Refresh account data
     } catch (error: any) {
-      setError(error.response?.data?.detail || `Failed to submit ${orderType} order`);
+      setDialogError(error.response?.data?.detail || `Failed to submit ${orderType} order`);
     } finally {
       setLoading(false);
     }
@@ -472,9 +479,27 @@ const ManualTradingPanel: React.FC = () => {
         
         <DialogContent>
           <Box display="flex" flexDirection="column" gap={3} mt={1}>
-            <Typography variant="body1">
-              Current Price: <strong>{formatCurrency(selectedStock?.price || 0)}</strong>
-            </Typography>
+            <Box>
+              <Typography variant="body1" gutterBottom>
+                Current Price: <strong>{formatCurrency(selectedStock?.price || 0)}</strong>
+              </Typography>
+              
+              {/* Available Shares Display for Sell Orders */}
+              {orderType === 'sell' && (
+                <Typography variant="body2" color="text.secondary">
+                  Available shares: <strong>
+                    {positions.find(p => p.symbol === selectedStock?.symbol)?.quantity || 0} shares
+                  </strong>
+                </Typography>
+              )}
+            </Box>
+            
+            {/* Dialog Error Display */}
+            {dialogError && (
+              <Alert severity="error" onClose={() => setDialogError(null)}>
+                {dialogError}
+              </Alert>
+            )}
             
             {/* Buy Mode Selection (only for buy orders) */}
             {orderType === 'buy' && (
@@ -504,10 +529,10 @@ const ManualTradingPanel: React.FC = () => {
                     
                     // For sell orders, validate against available shares
                     if (orderType === 'sell' && value > maxSell) {
-                      setError(`Cannot sell ${value} shares. You only own ${maxSell} shares.`);
+                      setDialogError(`Cannot sell ${value} shares. You only own ${maxSell} shares.`);
                       return;
                     } else {
-                      setError(null);
+                      setDialogError(null);
                     }
                     
                     setOrderDetails(prev => ({ ...prev, quantity: value }));
@@ -588,15 +613,22 @@ const ManualTradingPanel: React.FC = () => {
         </DialogContent>
         
         <DialogActions>
-          <Button onClick={() => setShowOrderDialog(false)}>Cancel</Button>
+          <Button onClick={() => {
+            setShowOrderDialog(false);
+            setDialogError(null); // Clear dialog errors when closing
+          }}>Cancel</Button>
           <Button
             variant="contained"
             color={orderType === 'buy' ? 'success' : 'error'}
             onClick={submitOrder}
-            disabled={loading}
+            disabled={loading || !!dialogError}
             startIcon={loading ? <CircularProgress size={16} /> : null}
           >
-            {loading ? 'Submitting...' : `${orderType.toUpperCase()} ${orderDetails.quantity} Shares`}
+            {loading ? 'Submitting...' : `${orderType.toUpperCase()} ${
+              orderType === 'buy' && orderDetails.buyMode === 'dollars' 
+                ? `$${orderDetails.dollarsAmount}` 
+                : `${orderDetails.quantity} Shares`
+            }`}
           </Button>
         </DialogActions>
       </Dialog>

@@ -43,7 +43,8 @@ class TradingService:
                     'AAPL': 185.0,
                     'TSLA': 260.0,
                     'SPY': 460.0,
-                    'MSFT': 350.0
+                    'MSFT': 350.0,
+                    'F': 11.00
                 }
                 return fallback_prices.get(symbol, 100.0)
         except Exception as e:
@@ -256,17 +257,40 @@ class TradingService:
                     stock_quotes = self.stock_data_client.get_stock_latest_quote(stock_request)
                     
                     for symbol, quote in stock_quotes.items():
+                        # Get the best available price
+                        bid = float(quote.bid_price) if quote.bid_price else 0
+                        ask = float(quote.ask_price) if quote.ask_price else 0
+                        
+                        # Use mid-price if both available, otherwise use whichever is available
+                        if bid > 0 and ask > 0:
+                            price = (bid + ask) / 2
+                        elif ask > 0:
+                            price = ask
+                        elif bid > 0:
+                            price = bid
+                        else:
+                            # Fallback to latest bar data if quote prices are 0
+                            try:
+                                bars_data = self.get_market_data(symbol, "1Day", 1)
+                                bars = bars_data.get('bars', [])
+                                if bars:
+                                    price = bars[-1]['close']  # Use latest close price
+                                else:
+                                    price = 0
+                            except:
+                                price = 0
+                        
                         result[symbol] = {
                             'symbol': symbol,
-                            'price': float(quote.bid_price) if quote.bid_price else float(quote.ask_price),
-                            'bid': float(quote.bid_price) if quote.bid_price else 0,
-                            'ask': float(quote.ask_price) if quote.ask_price else 0,
+                            'price': price,
+                            'bid': bid,
+                            'ask': ask,
                             'timestamp': quote.timestamp.isoformat()
                         }
                 except Exception as e:
                     logger.error(f"Error getting stock quotes: {e}")
                     # Add fallback data for stocks
-                    stock_prices = {'AAPL': 185, 'TSLA': 260, 'SPY': 460, 'MSFT': 350}
+                    stock_prices = {'AAPL': 185, 'TSLA': 260, 'SPY': 460, 'MSFT': 350, 'F': 11.00}
                     for symbol in stock_symbols:
                         price = stock_prices.get(symbol, 100)
                         result[symbol] = {

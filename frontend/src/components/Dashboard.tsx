@@ -256,6 +256,30 @@ const Dashboard: React.FC = () => {
       <header className="dashboard-header">
         <h1>🏊‍♂️ DiveTrader</h1>
         <p>Automated Trading Platform</p>
+        
+        {/* Real Account Overview */}
+        {accountData && (
+          <div className="account-overview-header">
+            <div className="account-stats">
+              <div className="stat-item">
+                <span className="stat-label">Portfolio Value</span>
+                <span className="stat-value">${accountData.portfolio_value.toLocaleString()}</span>
+              </div>
+              <div className="stat-item cash-available">
+                <span className="stat-label">💰 Available Cash</span>
+                <span className="stat-value">${accountData.cash.toLocaleString()}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Equity</span>
+                <span className="stat-value">${accountData.equity.toLocaleString()}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Buying Power</span>
+                <span className="stat-value">${accountData.buying_power.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       <PriceTicker symbols={activeSymbols} refreshInterval={30000} />
@@ -289,7 +313,12 @@ const Dashboard: React.FC = () => {
       <div className="dashboard-content">
         <div className="left-column">
           <div className="strategies-panel">
-            <h2>Trading Strategies</h2>
+            <h2>🎯 Active Trading Strategies</h2>
+            <div className="strategy-explanation">
+              <p className="explanation-text">
+                💡 Each strategy has allocated cash from your available balance for trading.
+              </p>
+            </div>
             {strategies.length === 0 ? (
               <div className="empty-state">
                 <p>No strategies yet. Create your first strategy!</p>
@@ -318,46 +347,52 @@ const Dashboard: React.FC = () => {
           <div className="performance-panel">
             {selectedStrategy ? (
               <>
-                <h2>📈 Performance Metrics</h2>
+                <h2>📈 Strategy Performance</h2>
+                <div className="performance-info">
+                  <p className="performance-note">
+                    🎯 Performance based on actual positions and trades for selected strategy
+                  </p>
+                </div>
                 <div className="metrics-grid">
                   {(() => {
                     const strategy = strategies.find(s => s.id === selectedStrategy);
                     if (!strategy) return null;
                     
-                    const totalPnL = strategy.current_capital - strategy.initial_capital;
-                    const roiPercentage = strategy.initial_capital > 0 
-                      ? (totalPnL / strategy.initial_capital) * 100 
-                      : 0;
+                    // Calculate actual P&L from strategy positions
+                    const strategyPositions = positions.filter(p => true); // All positions for this strategy
+                    const actualPnL = strategyPositions.reduce((sum, pos) => sum + pos.unrealized_pnl, 0);
+                    const totalInvested = strategyPositions.reduce((sum, pos) => sum + (pos.quantity * pos.avg_price), 0);
+                    const actualROI = totalInvested > 0 ? (actualPnL / totalInvested) * 100 : 0;
                     
                     return (
                       <>
                         <div className="metric-card">
-                          <h3>ROI</h3>
-                          <p className={roiPercentage >= 0 ? 'positive' : 'negative'}>
-                            {roiPercentage.toFixed(2)}%
+                          <h3>Actual ROI</h3>
+                          <p className={actualROI >= 0 ? 'positive' : 'negative'}>
+                            {actualROI.toFixed(2)}%
                           </p>
                         </div>
                         <div className="metric-card">
-                          <h3>Total P&L</h3>
-                          <p className={totalPnL >= 0 ? 'positive' : 'negative'}>
-                            ${totalPnL.toFixed(2)}
+                          <h3>Unrealized P&L</h3>
+                          <p className={actualPnL >= 0 ? 'positive' : 'negative'}>
+                            ${actualPnL.toFixed(2)}
                           </p>
                         </div>
                         <div className="metric-card">
-                          <h3>Win Rate</h3>
-                          <p>{performance?.win_rate?.toFixed(1) || '0.0'}%</p>
+                          <h3>Cash Allocation</h3>
+                          <p>${strategy.initial_capital.toLocaleString()}</p>
                         </div>
                         <div className="metric-card">
                           <h3>Total Trades</h3>
                           <p>{performance?.total_trades || 0}</p>
                         </div>
                         <div className="metric-card">
-                          <h3>Sharpe Ratio</h3>
-                          <p>{performance?.sharpe_ratio?.toFixed(3) || 'N/A'}</p>
+                          <h3>Win Rate</h3>
+                          <p>{performance?.win_rate?.toFixed(1) || '0.0'}%</p>
                         </div>
                         <div className="metric-card">
-                          <h3>Max Drawdown</h3>
-                          <p>{performance?.max_drawdown?.toFixed(2) || 'N/A'}%</p>
+                          <h3>Active Positions</h3>
+                          <p>{strategyPositions.length}</p>
                         </div>
                       </>
                     );

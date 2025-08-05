@@ -26,6 +26,82 @@
   font-size: 1.1rem;
 }
 
+/* Account Overview Header */
+.account-overview-header {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid #e1e8ed;
+}
+
+.account-stats {
+  display: flex;
+  justify-content: center;
+  gap: 3rem;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.cash-available .stat-value {
+  color: #27ae60;
+  font-size: 1.6rem;
+}
+
+.cash-available .stat-label {
+  color: #27ae60;
+  font-weight: 600;
+}
+
+/* Strategy Explanation */
+.strategy-explanation {
+  margin: 0.5rem 0 1rem 0;
+  padding: 0.75rem;
+  background: rgba(52, 152, 219, 0.1);
+  border-left: 3px solid #3498db;
+  border-radius: 4px;
+}
+
+.explanation-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #2c3e50;
+  font-style: italic;
+}
+
+/* Performance Info */
+.performance-info {
+  margin: 0.5rem 0 1rem 0;
+  padding: 0.75rem;
+  background: rgba(46, 204, 113, 0.1);
+  border-left: 3px solid #2ecc71;
+  border-radius: 4px;
+}
+
+.performance-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #2c3e50;
+  font-style: italic;
+}
+
 .dashboard-controls {
   padding: 1.5rem 2rem;
   display: flex;

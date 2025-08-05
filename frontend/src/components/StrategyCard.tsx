@@ -1,15 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-
-interface Strategy {
-  id: number;
-  name: string;
-  strategy_type: string;
-  is_active: boolean;
-  is_running?: boolean;
-  initial_capital: number;
-  current_capital: number;
-  created_at: string;
-}
+import type { Strategy } from '../types/api';
 
 interface StrategyCardProps {
   strategy: Strategy;
@@ -111,15 +101,18 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
 
       <div className="strategy-metrics">
         <div className="metric">
-          <span className="label">Initial Capital:</span>
+          <span className="label">💰 Cash Allocation:</span>
           <span className="value">${strategy.initial_capital.toLocaleString()}</span>
         </div>
         <div className="metric">
-          <span className="label">Current Capital:</span>
-          <span className="value">${strategy.current_capital.toLocaleString()}</span>
+          <span className="label">📈 Strategy P&L:</span>
+          <span className={`value ${strategy.current_capital >= strategy.initial_capital ? 'positive' : 'negative'}`}>
+            ${(strategy.current_capital - strategy.initial_capital).toLocaleString()} 
+            ({(((strategy.current_capital - strategy.initial_capital) / strategy.initial_capital) * 100).toFixed(1)}%)
+          </span>
         </div>
         <div className="metric">
-          <span className="label">Created:</span>
+          <span className="label">📅 Created:</span>
           <span className="value">
             {new Date(strategy.created_at).toLocaleDateString()}
           </span>

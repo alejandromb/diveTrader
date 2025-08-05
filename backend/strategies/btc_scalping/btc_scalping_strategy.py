@@ -417,6 +417,18 @@ class BTCScalpingStrategy(BaseStrategy):
                 take_profit_pct = self.get_float_setting("take_profit_pct", 0.002)
                 stop_loss_pct = self.get_float_setting("stop_loss_pct", 0.001)
                 
+                # Update strategy's total_invested amount for buy orders
+                if side == "buy":
+                    try:
+                        investment_amount = position_size * price
+                        strategy = self.db_session.query(Strategy).filter(Strategy.id == self.strategy_id).first()
+                        if strategy:
+                            strategy.total_invested = (strategy.total_invested or 0.0) + investment_amount
+                            self.db_session.commit()
+                            logger.info(f"Updated strategy total_invested to ${strategy.total_invested:.2f}")
+                    except Exception as e:
+                        logger.error(f"Error updating strategy total_invested: {e}")
+                
                 self.current_position = {
                     'trade_id': trade.id,
                     'side': side,

@@ -36,6 +36,7 @@ class StrategyResponse(BaseModel):
     is_active: bool
     initial_capital: float
     current_capital: float
+    total_invested: float
     created_at: str
 
 @router.get("/", response_model=List[StrategyResponse])
@@ -50,6 +51,7 @@ async def get_strategies(db: Session = Depends(get_db)):
             is_active=s.is_active,
             initial_capital=s.initial_capital,
             current_capital=s.current_capital,
+            total_invested=s.total_invested or 0.0,
             created_at=s.created_at.isoformat()
         )
         for s in strategies
@@ -77,6 +79,7 @@ async def create_strategy(strategy: StrategyCreate, db: Session = Depends(get_db
         is_active=db_strategy.is_active,
         initial_capital=db_strategy.initial_capital,
         current_capital=db_strategy.current_capital,
+        total_invested=db_strategy.total_invested or 0.0,
         created_at=db_strategy.created_at.isoformat()
     )
 

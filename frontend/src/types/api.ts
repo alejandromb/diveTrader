@@ -71,6 +71,7 @@ export interface Strategy {
   is_active: boolean;
   initial_capital: number;
   current_capital: number;
+  total_invested: number;
   created_at: string;
   updated_at: string;
   config?: string;

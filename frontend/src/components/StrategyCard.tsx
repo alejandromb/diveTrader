@@ -171,6 +171,13 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
           </Box>
           
           <Box display="flex" justifyContent="space-between">
+            <Typography variant="body2" color="text.secondary">💵 Total Invested:</Typography>
+            <Typography variant="body2" fontWeight="medium" color="primary.main">
+              ${strategy.total_invested?.toFixed(2) || '0.00'}
+            </Typography>
+          </Box>
+          
+          <Box display="flex" justifyContent="space-between">
             <Typography variant="body2" color="text.secondary">🎯 Trade Size:</Typography>
             <Typography variant="body2" fontWeight="medium">
               {strategy.strategy_type === 'btc_scalping' && btcSettings ? 

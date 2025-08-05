@@ -25,6 +25,7 @@ class Strategy(Base):
     is_active = Column(Boolean, default=True)
     initial_capital = Column(Float)
     current_capital = Column(Float)
+    total_invested = Column(Float, default=0.0)  # Track total amount invested by strategy
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     config = Column(Text)  # JSON string for strategy configuration

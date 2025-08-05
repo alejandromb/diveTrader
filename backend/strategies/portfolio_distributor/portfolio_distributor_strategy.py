@@ -215,6 +215,17 @@ class PortfolioDistributorStrategy(BaseStrategy):
             
             if investment_results:
                 total_invested = sum(result['estimated_cost'] for result in investment_results)
+                
+                # Update strategy's total_invested amount
+                try:
+                    strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+                    if strategy:
+                        strategy.total_invested = (strategy.total_invested or 0.0) + total_invested
+                        db.commit()
+                        self.logger.info(f"Updated strategy total_invested to ${strategy.total_invested:.2f}")
+                except Exception as e:
+                    self.logger.error(f"Error updating strategy total_invested: {e}")
+                
                 self.logger.info(f"Portfolio investment completed: ${total_invested:.2f} across {len(investment_results)} symbols")
                 return True
             else:

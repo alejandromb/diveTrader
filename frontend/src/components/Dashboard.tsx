@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_CONFIG } from '../config/constants';
+import { apiV2, strategyHelpers } from '../services/apiV2';
+import type { Strategy, StrategyType } from '../types/api';
 import StrategyCard from './StrategyCard';
 import PerformanceChart from './PerformanceChart';
 import BacktestModal from './BacktestModal';
@@ -13,19 +15,11 @@ import CreateStrategyModal, { type CreateStrategyData } from './CreateStrategyMo
 import RiskManagementPanel from './RiskManagementPanel';
 import StrategyEventLogsModal from './StrategyEventLogsModal';
 import StrategySettingsModal from './StrategySettingsModal';
+import TypedSettingsModal from './TypedSettingsModal';
 import './Dashboard.css';
 import './EnhancedStyles.css';
 
-interface Strategy {
-  id: number;
-  name: string;
-  strategy_type: string;
-  is_active: boolean;
-  is_running?: boolean;
-  initial_capital: number;
-  current_capital: number;
-  created_at: string;
-}
+// Using Strategy type from ../types/api.ts
 
 interface Performance {
   strategy_id: number;
@@ -90,6 +84,9 @@ const Dashboard: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsStrategyId, setSettingsStrategyId] = useState<number | null>(null);
   const [settingsStrategyName, setSettingsStrategyName] = useState<string>('');
+  const [showTypedSettings, setShowTypedSettings] = useState(false);
+  const [selectedTypedStrategy, setSelectedTypedStrategy] = useState<Strategy | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [activeSymbols] = useState<string[]>(['BTC/USD', 'AAPL', 'TSLA', 'SPY']);
 
   useEffect(() => {
@@ -108,33 +105,12 @@ const Dashboard: React.FC = () => {
 
   const fetchStrategies = async () => {
     try {
-      const response = await axios.get(`${API_BASE}/strategies/`);
-      const strategiesData = response.data;
+      const strategiesData = await apiV2.getStrategies();
+      console.log('Fetched strategies from v2 API:', strategiesData);
       
-      // Fetch detailed status for each strategy to get runtime info
-      console.log('Fetching status for strategies:', strategiesData.map(s => s.id));
-      const strategiesWithStatus = await Promise.all(
-        strategiesData.map(async (strategy: Strategy) => {
-          try {
-            const statusResponse = await axios.get(`${API_BASE}/strategies/${strategy.id}/status`);
-            console.log(`Strategy ${strategy.id} status:`, statusResponse.data);
-            return {
-              ...strategy,
-              is_running: statusResponse.data.is_running
-            };
-          } catch (error) {
-            console.error(`Error fetching status for strategy ${strategy.id}:`, error);
-            return {
-              ...strategy,
-              is_running: false
-            };
-          }
-        })
-      );
-      
-      setStrategies(strategiesWithStatus);
-      if (strategiesWithStatus.length > 0 && !selectedStrategy) {
-        setSelectedStrategy(strategiesWithStatus[0].id);
+      setStrategies(strategiesData);
+      if (strategiesData.length > 0 && !selectedStrategy) {
+        setSelectedStrategy(strategiesData[0].id);
       }
       setLoading(false);
     } catch (error) {
@@ -190,7 +166,7 @@ const Dashboard: React.FC = () => {
 
   const startStrategy = async (strategyId: number) => {
     try {
-      await axios.post(`${API_BASE}/strategies/${strategyId}/start`);
+      await apiV2.startStrategy(strategyId);
       fetchStrategies(); // Refresh strategies
     } catch (error) {
       console.error('Error starting strategy:', error);
@@ -199,7 +175,7 @@ const Dashboard: React.FC = () => {
 
   const stopStrategy = async (strategyId: number) => {
     try {
-      await axios.post(`${API_BASE}/strategies/${strategyId}/stop`);
+      await apiV2.stopStrategy(strategyId);
       fetchStrategies(); // Refresh strategies
     } catch (error) {
       console.error('Error stopping strategy:', error);
@@ -208,8 +184,9 @@ const Dashboard: React.FC = () => {
 
   const createStrategy = async (strategyData: CreateStrategyData) => {
     try {
+      // Still using axios for create strategy since apiV2 might not have this yet
       const response = await axios.post(`${API_BASE}/strategies/`, strategyData);
-      setStrategies([...strategies, response.data]);
+      fetchStrategies(); // Refresh the entire list to get proper v2 format
       setShowCreateStrategy(false);
     } catch (error) {
       console.error('Error creating strategy:', error);
@@ -218,11 +195,12 @@ const Dashboard: React.FC = () => {
 
   const deleteStrategy = async (strategyId: number) => {
     try {
+      // Still using axios for delete strategy since apiV2 might not have this yet
       await axios.delete(`${API_BASE}/strategies/${strategyId}`);
-      setStrategies(strategies.filter(s => s.id !== strategyId));
       if (selectedStrategy === strategyId) {
         setSelectedStrategy(null);
       }
+      fetchStrategies(); // Refresh the entire list
     } catch (error) {
       console.error('Error deleting strategy:', error);
     }
@@ -235,9 +213,38 @@ const Dashboard: React.FC = () => {
   };
 
   const showStrategySettings = (strategyId: number, strategyName: string) => {
-    setSettingsStrategyId(strategyId);
-    setSettingsStrategyName(strategyName);
-    setShowSettings(true);
+    const strategy = strategies.find(s => s.id === strategyId);
+    if (strategy) {
+      setSelectedTypedStrategy(strategy);
+      setShowTypedSettings(true);
+    } else {
+      // Fallback to old settings modal
+      setSettingsStrategyId(strategyId);
+      setSettingsStrategyName(strategyName);
+      setShowSettings(true);
+    }
+  };
+
+  const closeTypedSettings = () => {
+    setSelectedTypedStrategy(null);
+    setShowTypedSettings(false);
+  };
+
+  const onTypedSettingsUpdated = () => {
+    fetchStrategies(); // Refresh strategies after settings update
+  };
+
+  const handleSyncAllCapitals = async () => {
+    try {
+      setSyncing(true);
+      const result = await apiV2.syncAllStrategiesCapital();
+      alert(`✅ Account Sync Complete!\n${result.message}`);
+      await fetchStrategies(); // Refresh to show updated capitals
+    } catch (err) {
+      alert(`❌ Sync Failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   if (loading) {
@@ -263,6 +270,13 @@ const Dashboard: React.FC = () => {
           disabled={!selectedStrategy}
         >
           📊 Backtest
+        </button>
+        <button 
+          onClick={handleSyncAllCapitals} 
+          className="btn btn-secondary"
+          disabled={syncing}
+        >
+          {syncing ? '🔄 Syncing...' : '🔄 Sync with Alpaca'}
         </button>
         <button 
           onClick={() => window.open('http://localhost:8000/docs', '_blank')} 
@@ -302,38 +316,52 @@ const Dashboard: React.FC = () => {
 
         <div className="center-column">
           <div className="performance-panel">
-            {selectedStrategy && performance ? (
+            {selectedStrategy ? (
               <>
                 <h2>📈 Performance Metrics</h2>
                 <div className="metrics-grid">
-                  <div className="metric-card">
-                    <h3>ROI</h3>
-                    <p className={performance.roi_percentage >= 0 ? 'positive' : 'negative'}>
-                      {performance.roi_percentage.toFixed(2)}%
-                    </p>
-                  </div>
-                  <div className="metric-card">
-                    <h3>Total P&L</h3>
-                    <p className={performance.total_pnl >= 0 ? 'positive' : 'negative'}>
-                      ${performance.total_pnl.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="metric-card">
-                    <h3>Win Rate</h3>
-                    <p>{performance.win_rate.toFixed(1)}%</p>
-                  </div>
-                  <div className="metric-card">
-                    <h3>Total Trades</h3>
-                    <p>{performance.total_trades}</p>
-                  </div>
-                  <div className="metric-card">
-                    <h3>Sharpe Ratio</h3>
-                    <p>{performance.sharpe_ratio?.toFixed(3) || 'N/A'}</p>
-                  </div>
-                  <div className="metric-card">
-                    <h3>Max Drawdown</h3>
-                    <p>{performance.max_drawdown?.toFixed(2) || 'N/A'}%</p>
-                  </div>
+                  {(() => {
+                    const strategy = strategies.find(s => s.id === selectedStrategy);
+                    if (!strategy) return null;
+                    
+                    const totalPnL = strategy.current_capital - strategy.initial_capital;
+                    const roiPercentage = strategy.initial_capital > 0 
+                      ? (totalPnL / strategy.initial_capital) * 100 
+                      : 0;
+                    
+                    return (
+                      <>
+                        <div className="metric-card">
+                          <h3>ROI</h3>
+                          <p className={roiPercentage >= 0 ? 'positive' : 'negative'}>
+                            {roiPercentage.toFixed(2)}%
+                          </p>
+                        </div>
+                        <div className="metric-card">
+                          <h3>Total P&L</h3>
+                          <p className={totalPnL >= 0 ? 'positive' : 'negative'}>
+                            ${totalPnL.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="metric-card">
+                          <h3>Win Rate</h3>
+                          <p>{performance?.win_rate?.toFixed(1) || '0.0'}%</p>
+                        </div>
+                        <div className="metric-card">
+                          <h3>Total Trades</h3>
+                          <p>{performance?.total_trades || 0}</p>
+                        </div>
+                        <div className="metric-card">
+                          <h3>Sharpe Ratio</h3>
+                          <p>{performance?.sharpe_ratio?.toFixed(3) || 'N/A'}</p>
+                        </div>
+                        <div className="metric-card">
+                          <h3>Max Drawdown</h3>
+                          <p>{performance?.max_drawdown?.toFixed(2) || 'N/A'}%</p>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 <div className="chart-container">
@@ -404,6 +432,16 @@ const Dashboard: React.FC = () => {
           onClose={() => setShowSettings(false)}
           strategyId={settingsStrategyId}
           strategyName={settingsStrategyName}
+        />
+      )}
+
+      {/* Typed Settings Modal */}
+      {selectedTypedStrategy && (
+        <TypedSettingsModal
+          strategy={selectedTypedStrategy}
+          isOpen={showTypedSettings}
+          onClose={closeTypedSettings}
+          onSettingsUpdated={onTypedSettingsUpdated}
         />
       )}
     </div>

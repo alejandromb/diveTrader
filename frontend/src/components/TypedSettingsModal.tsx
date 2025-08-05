@@ -6,13 +6,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
   apiV2, 
+  strategyHelpers 
+} from '../services/apiV2';
+import type { 
   Strategy, 
   StrategyType, 
   BTCScalpingSettings, 
-  PortfolioDistributorSettings,
-  InvestmentFrequency,
-  strategyHelpers 
+  PortfolioDistributorSettings
 } from '../services/apiV2';
+import { InvestmentFrequency } from '../types/api';
 
 interface TypedSettingsModalProps {
   strategy: Strategy;

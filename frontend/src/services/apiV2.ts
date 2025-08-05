@@ -4,9 +4,11 @@
  */
 
 import {
-  Strategy,
   StrategyType,
-  InvestmentFrequency,
+  InvestmentFrequency
+} from '../types/api';
+import type {
+  Strategy,
   BTCScalpingSettings,
   PortfolioDistributorSettings,
   StrategyListResponse,

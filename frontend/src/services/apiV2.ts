@@ -110,6 +110,15 @@ class ApiV2Client {
   async getPortfolioSettingsSchema(): Promise<any> {
     return this.request('/strategies/schema/portfolio-settings');
   }
+
+  // Account Sync
+  async syncStrategyCapital(strategyId: number): Promise<any> {
+    return this.request(`/strategies/${strategyId}/sync-capital`, { method: 'POST' });
+  }
+
+  async syncAllStrategiesCapital(): Promise<any> {
+    return this.request('/strategies/sync-all-capitals', { method: 'POST' });
+  }
 }
 
 // Export singleton instance

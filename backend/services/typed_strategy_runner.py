@@ -174,6 +174,10 @@ class TypedStrategyRunner:
         check_interval = self.check_intervals.get(strategy_type, 60)
         logger.info(f"🚀 Typed strategy {strategy_id} thread started (interval: {check_interval}s)")
         
+        # Track iterations for periodic account sync
+        iteration_count = 0
+        sync_frequency = 60  # Sync every 60 iterations
+        
         while not self._shutdown and strategy_id in self.running_strategies:
             try:
                 # Create new DB session for each iteration
@@ -184,6 +188,24 @@ class TypedStrategyRunner:
                     if not strategy or not strategy.is_active:
                         logger.info(f"Strategy {strategy_id} deactivated, stopping...")
                         break
+
+                    # 🔄 PERIODIC ACCOUNT SYNC - Sync capital periodically during execution
+                    iteration_count += 1
+                    if iteration_count % sync_frequency == 0:
+                        logger.info(f"🔄 Periodic account sync for strategy {strategy_id} (iteration {iteration_count})")
+                        sync_success = self.account_sync_service.sync_strategy_capital(strategy_id, db)
+                        if sync_success:
+                            logger.info(f"✅ Strategy {strategy_id} capital synced during execution")
+                            db.refresh(strategy)  # Refresh to get updated capital
+                        else:
+                            logger.warning(f"⚠️ Periodic account sync failed for strategy {strategy_id}")
+                        
+                        # Log account sync event
+                        strategy_event_logger.log_account_sync(db, strategy_id, {
+                            "iteration": iteration_count,
+                            "sync_success": sync_success,
+                            "capital": float(strategy.current_capital) if strategy else 0
+                        })
                         
                     # Update strategy instance with fresh DB session
                     if hasattr(strategy_instance, 'db_session'):

@@ -18,6 +18,7 @@ export const TypedStrategyDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   // Load strategies on component mount
   useEffect(() => {
@@ -69,6 +70,32 @@ export const TypedStrategyDashboard: React.FC = () => {
     loadStrategies(); // Refresh strategies after settings update
   };
 
+  const handleSyncAllCapitals = async () => {
+    try {
+      setSyncing(true);
+      const result = await apiV2.syncAllStrategiesCapital();
+      alert(`✅ Account Sync Complete!\n${result.message}`);
+      await loadStrategies(); // Refresh to show updated capitals
+    } catch (err) {
+      alert(`❌ Sync Failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleSyncStrategyCapital = async (strategy: Strategy) => {
+    try {
+      setSyncing(true);
+      const result = await apiV2.syncStrategyCapital(strategy.id);
+      alert(`✅ Strategy "${strategy.name}" synced!\nOld: $${result.old_capital}\nNew: $${result.new_capital}`);
+      await loadStrategies(); // Refresh to show updated capital
+    } catch (err) {
+      alert(`❌ Sync Failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -101,9 +128,32 @@ export const TypedStrategyDashboard: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-900">
           Trading Strategies Dashboard
         </h1>
-        <div className="flex items-center text-sm text-gray-600">
-          <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-          SQLModel v2 API - Type Safe
+        <div className="flex items-center space-x-4">
+          {/* Sync All Button */}
+          <button
+            onClick={handleSyncAllCapitals}
+            disabled={syncing}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {syncing ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Syncing...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Sync with Alpaca
+              </>
+            )}
+          </button>
+          
+          <div className="flex items-center text-sm text-gray-600">
+            <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+            SQLModel v2 API - Type Safe
+          </div>
         </div>
       </div>
 
@@ -225,9 +275,20 @@ export const TypedStrategyDashboard: React.FC = () => {
                   
                   <button
                     onClick={() => openSettings(strategy)}
-                    className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     Settings
+                  </button>
+                  
+                  <button
+                    onClick={() => handleSyncStrategyCapital(strategy)}
+                    disabled={syncing}
+                    className="px-2 py-2 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
+                    title="Sync with Alpaca Account"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -256,6 +317,9 @@ export const TypedStrategyDashboard: React.FC = () => {
             </p>
             <p className="text-xs text-green-700">
               Full type safety with automatic validation and TypeScript integration
+            </p>
+            <p className="text-xs text-green-600 mt-1">
+              🔄 Auto-sync: Strategy capitals sync automatically with Alpaca account on startup and every 60 iterations
             </p>
           </div>
         </div>

@@ -12,6 +12,7 @@ from database.sqlmodel_models import (
     StrategyTypeEnum, InvestmentFrequencyEnum
 )
 from services.typed_strategy_runner import typed_strategy_runner
+from services.account_sync_service import AccountSyncService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -505,6 +506,89 @@ async def update_portfolio_settings(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update portfolio settings"
+        )
+
+# Account Sync Endpoints
+@router.post("/{strategy_id}/sync-capital")
+async def sync_strategy_capital(strategy_id: int, session: Session = Depends(get_session)):
+    """Manually sync strategy capital with Alpaca account"""
+    try:
+        # Verify strategy exists
+        strategy = session.get(Strategy, strategy_id)
+        if not strategy:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Strategy {strategy_id} not found"
+            )
+        
+        # Sync capital
+        account_sync = AccountSyncService()
+        old_capital = strategy.current_capital
+        success = account_sync.sync_strategy_capital(strategy_id, session)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to sync strategy capital with Alpaca account"
+            )
+        
+        # Refresh strategy to get updated capital
+        session.refresh(strategy)
+        
+        return {
+            "message": f"Strategy capital synced successfully",
+            "strategy_id": strategy_id,
+            "old_capital": old_capital,
+            "new_capital": strategy.current_capital,
+            "synced_at": strategy.updated_at.isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing strategy capital {strategy_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to sync strategy capital"
+        )
+
+@router.post("/sync-all-capitals")
+async def sync_all_strategy_capitals(session: Session = Depends(get_session)):
+    """Sync all strategies' capital with Alpaca account"""
+    try:
+        # Get all strategies
+        statement = select(Strategy)
+        strategies = session.exec(statement).all()
+        
+        if not strategies:
+            return {"message": "No strategies found", "synced_strategies": []}
+        
+        account_sync = AccountSyncService()
+        synced_strategies = []
+        
+        for strategy in strategies:
+            old_capital = strategy.current_capital
+            success = account_sync.sync_strategy_capital(strategy.id, session)
+            
+            if success:
+                session.refresh(strategy)
+                synced_strategies.append({
+                    "strategy_id": strategy.id,
+                    "name": strategy.name,
+                    "old_capital": old_capital,
+                    "new_capital": strategy.current_capital
+                })
+        
+        return {
+            "message": f"Synced {len(synced_strategies)} out of {len(strategies)} strategies",
+            "synced_strategies": synced_strategies
+        }
+        
+    except Exception as e:
+        logger.error(f"Error syncing all strategy capitals: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to sync all strategy capitals"
         )
 
 # Schema and enum endpoints moved to top of file to avoid route conflicts

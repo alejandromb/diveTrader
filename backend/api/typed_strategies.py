@@ -104,6 +104,27 @@ class PortfolioSettingsUpdateRequest(BaseModel):
     max_position_size: Optional[float] = None
     min_cash_reserve: Optional[float] = None
 
+# Schema endpoints - using different path to avoid routing conflicts
+@router.get("/schema/btc-settings")
+async def get_btc_settings_schema():
+    """Get JSON schema for BTC settings (for TypeScript generation)"""
+    return BTCScalpingSettings.model_json_schema()
+
+@router.get("/schema/portfolio-settings")
+async def get_portfolio_settings_schema():
+    """Get JSON schema for portfolio settings (for TypeScript generation)"""
+    return PortfolioDistributorSettings.model_json_schema()
+
+@router.get("/enums/strategy-types")
+async def get_strategy_types():
+    """Get available strategy types"""
+    return [{"value": item.value, "name": item.name} for item in StrategyTypeEnum]
+
+@router.get("/enums/investment-frequencies")
+async def get_investment_frequencies():
+    """Get available investment frequencies"""
+    return [{"value": item.value, "name": item.name} for item in InvestmentFrequencyEnum]
+
 @router.get("/", response_model=List[StrategyResponse])
 async def get_all_strategies(session: Session = Depends(get_session)):
     """Get all strategies with running status"""
@@ -486,23 +507,4 @@ async def update_portfolio_settings(
             detail="Failed to update portfolio settings"
         )
 
-# Schema endpoints for frontend TypeScript generation
-@router.get("/schemas/btc-settings")
-async def get_btc_settings_schema():
-    """Get JSON schema for BTC settings (for TypeScript generation)"""
-    return BTCScalpingSettings.model_json_schema()
-
-@router.get("/schemas/portfolio-settings")
-async def get_portfolio_settings_schema():
-    """Get JSON schema for portfolio settings (for TypeScript generation)"""
-    return PortfolioDistributorSettings.model_json_schema()
-
-@router.get("/enums/strategy-types")
-async def get_strategy_types():
-    """Get available strategy types"""
-    return [{"value": item.value, "name": item.name} for item in StrategyTypeEnum]
-
-@router.get("/enums/investment-frequencies")
-async def get_investment_frequencies():
-    """Get available investment frequencies"""
-    return [{"value": item.value, "name": item.name} for item in InvestmentFrequencyEnum]
+# Schema and enum endpoints moved to top of file to avoid route conflicts

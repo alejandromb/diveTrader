@@ -15,6 +15,15 @@ class OrderRequest(BaseModel):
     side: str  # "buy" or "sell"
     quantity: float
 
+class ManualOrderRequest(BaseModel):
+    symbol: str
+    side: str  # "buy" or "sell"
+    quantity: float = None  # Number of shares (can be fractional)
+    notional: float = None  # Dollar amount for fractional share purchases
+    type: str = "market"  # "market" or "limit"
+    time_in_force: str = "day"  # "day" or "gtc"
+    limit_price: float = None
+
 class TradeResponse(BaseModel):
     id: int
     strategy_id: int
@@ -130,5 +139,96 @@ async def get_latest_quotes(symbols: str):
     try:
         symbol_list = [s.strip() for s in symbols.split(',')]
         return trading_service.get_latest_quotes(symbol_list)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Manual Trading Endpoints
+
+@router.get("/positions")
+async def get_all_positions(db: Session = Depends(get_db)):
+    """Get all positions across all strategies for manual trading"""
+    try:
+        # Get positions directly from Alpaca
+        alpaca_positions = trading_service.get_alpaca_positions()
+        
+        positions = []
+        for pos in alpaca_positions:
+            positions.append({
+                "symbol": pos.symbol,
+                "quantity": float(pos.qty),
+                "avg_price": float(pos.avg_entry_price),
+                "current_price": float(pos.market_value) / float(pos.qty) if float(pos.qty) != 0 else 0,
+                "market_value": float(pos.market_value),
+                "unrealized_pnl": float(pos.unrealized_pl),
+                "unrealized_pnl_percent": float(pos.unrealized_plpc) * 100,
+                "side": "long" if float(pos.qty) > 0 else "short"
+            })
+        
+        return positions
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/orders")
+async def place_manual_order(order: ManualOrderRequest):
+    """Place a manual trading order (not tied to any strategy)"""
+    try:
+        result = trading_service.place_manual_order(
+            symbol=order.symbol,
+            side=order.side,
+            quantity=order.quantity,
+            notional=order.notional,
+            order_type=order.type,
+            time_in_force=order.time_in_force,
+            limit_price=order.limit_price
+        )
+        order_description = f"${order.notional} of {order.symbol}" if order.notional else f"{order.quantity} shares of {order.symbol}"
+        return {
+            "message": f"{order.side.upper()} order placed for {order_description}",
+            "order_id": result.id if hasattr(result, 'id') else None,
+            "status": "submitted"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/quote/{symbol}")
+async def get_single_quote(symbol: str):
+    """Get a single stock quote with formatted data"""
+    try:
+        quotes = trading_service.get_latest_quotes([symbol.upper()])
+        quote_data = quotes.get(symbol.upper())
+        
+        if not quote_data:
+            raise HTTPException(status_code=404, detail=f"Quote not found for {symbol}")
+        
+        # Get additional market data if available
+        try:
+            bars = trading_service.get_market_data(symbol.upper(), "1Day", 2)
+            prev_close = bars[-2]['close'] if len(bars) >= 2 else quote_data.get('ask_price', 0)
+            current_price = quote_data.get('ask_price', quote_data.get('bid_price', 0))
+            change = current_price - prev_close
+            change_percent = (change / prev_close * 100) if prev_close > 0 else 0
+        except:
+            current_price = quote_data.get('ask_price', quote_data.get('bid_price', 0))
+            change = 0
+            change_percent = 0
+            prev_close = current_price
+        
+        return {
+            "symbol": symbol.upper(),
+            "price": current_price,
+            "change": change,
+            "changePercent": change_percent,
+            "volume": quote_data.get('ask_size', 0) + quote_data.get('bid_size', 0),
+            "high": current_price,  # Would need intraday data for actual high
+            "low": current_price,   # Would need intraday data for actual low
+            "open": prev_close,
+            "previousClose": prev_close,
+            "bid": quote_data.get('bid_price', 0),
+            "ask": quote_data.get('ask_price', 0),
+            "bid_size": quote_data.get('bid_size', 0),
+            "ask_size": quote_data.get('ask_size', 0)
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

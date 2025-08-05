@@ -333,3 +333,78 @@ class TradingService:
         except Exception as e:
             logger.error(f"Error getting market data: {e}")
             raise
+
+    def get_alpaca_positions(self):
+        """Get all positions directly from Alpaca"""
+        try:
+            positions = self.trading_client.get_all_positions()
+            return positions
+        except Exception as e:
+            logger.error(f"Error getting Alpaca positions: {e}")
+            raise
+
+    def place_manual_order(self, symbol: str, side: str, quantity: float = None, 
+                          notional: float = None, order_type: str = "market", 
+                          time_in_force: str = "day", limit_price: float = None):
+        """Place a manual order directly through Alpaca (not tied to any strategy)"""
+        try:
+            # Convert side to OrderSide enum
+            order_side = OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL
+            
+            # Convert time_in_force to TimeInForce enum
+            tif = TimeInForce.DAY if time_in_force.lower() == "day" else TimeInForce.GTC
+            
+            if order_type.lower() == "market":
+                # Market order
+                from alpaca.trading.requests import MarketOrderRequest
+                if notional:
+                    # Fractional shares using dollar amount
+                    order_request = MarketOrderRequest(
+                        symbol=symbol,
+                        notional=notional,
+                        side=order_side,
+                        time_in_force=tif
+                    )
+                else:
+                    # Regular shares order
+                    order_request = MarketOrderRequest(
+                        symbol=symbol,
+                        qty=quantity,
+                        side=order_side,
+                        time_in_force=tif
+                    )
+            else:
+                # Limit order
+                from alpaca.trading.requests import LimitOrderRequest
+                if limit_price is None:
+                    raise ValueError("Limit price required for limit orders")
+                
+                if notional:
+                    # Fractional shares limit order (if supported)
+                    order_request = LimitOrderRequest(
+                        symbol=symbol,
+                        notional=notional,
+                        side=order_side,
+                        time_in_force=tif,
+                        limit_price=limit_price
+                    )
+                else:
+                    # Regular limit order
+                    order_request = LimitOrderRequest(
+                        symbol=symbol,
+                        qty=quantity,
+                        side=order_side,
+                        time_in_force=tif,
+                        limit_price=limit_price
+                    )
+            
+            # Submit order to Alpaca
+            order = self.trading_client.submit_order(order_request)
+            
+            order_description = f"${notional} of {symbol}" if notional else f"{quantity} shares of {symbol}"
+            logger.info(f"Manual {side} order placed: {order_description}")
+            return order
+            
+        except Exception as e:
+            logger.error(f"Error placing manual order: {e}")
+            raise

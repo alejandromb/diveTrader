@@ -36,6 +36,7 @@ import RiskManagementPanel from './RiskManagementPanel';
 import StrategyEventLogsModal from './StrategyEventLogsModal';
 import StrategySettingsModal from './StrategySettingsModal';
 import TypedSettingsModal from './TypedSettingsModal';
+import ManualTradingPanel from './ManualTradingPanel';
 import './Dashboard.css';
 import './EnhancedStyles.css';
 
@@ -527,6 +528,11 @@ const Dashboard: React.FC = () => {
             </Box>
           </Grid>
         </Grid>
+      </Container>
+
+      {/* Manual Trading Section */}
+      <Container maxWidth="xl" sx={{ mt: 3 }}>
+        <ManualTradingPanel />
       </Container>
 
       {showBacktest && selectedStrategy && (

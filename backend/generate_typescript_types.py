@@ -41,6 +41,14 @@ def json_schema_to_typescript(schema: Dict[str, Any], interface_name: str) -> st
             # Special case for investment_frequency - use the enum type
             if prop_name == "investment_frequency":
                 ts_type = "InvestmentFrequency"
+        # Handle allOf patterns (often used for enum references)
+        elif "allOf" in prop_schema:
+            # Check if it's referencing an enum
+            all_of = prop_schema["allOf"][0] if prop_schema["allOf"] else {}
+            if "$ref" in all_of and "InvestmentFrequencyEnum" in all_of["$ref"]:
+                ts_type = "InvestmentFrequency"
+            else:
+                ts_type = map_type(prop_type, prop_format)
         # Handle arrays
         elif prop_type == "array" and "items" in prop_schema:
             items_type = map_type(prop_schema["items"].get("type", "any"))

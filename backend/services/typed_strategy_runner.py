@@ -12,6 +12,7 @@ from database.sqlmodel_models import Strategy, StrategyTypeEnum
 from services.trading_service import TradingService
 from services.performance_service import PerformanceService
 from services.strategy_event_logger import strategy_event_logger
+from services.account_sync_service import AccountSyncService
 from strategies.btc_scalping.typed_btc_scalping_strategy import TypedBTCScalpingStrategy
 from strategies.portfolio_distributor.typed_portfolio_distributor_strategy import TypedPortfolioDistributorStrategy
 import logging
@@ -28,6 +29,7 @@ class TypedStrategyRunner:
         self.strategy_instances: Dict[int, object] = {}
         self.trading_service = TradingService()
         self.performance_service = PerformanceService()
+        self.account_sync_service = AccountSyncService()
         
         # Different check intervals for different strategy types
         self.check_intervals = {
@@ -54,6 +56,17 @@ class TypedStrategyRunner:
                 if not strategy.is_active:
                     logger.error(f"Strategy {strategy_id} is not active")
                     return False
+
+                # 🔄 AUTOMATIC ACCOUNT SYNC - Sync strategy capital with Alpaca account before starting
+                logger.info(f"🔄 Syncing strategy {strategy_id} capital with Alpaca account...")
+                sync_success = self.account_sync_service.sync_strategy_capital(strategy_id, db)
+                if sync_success:
+                    logger.info(f"✅ Strategy {strategy_id} capital synced with Alpaca account")
+                    # Refresh strategy object to get updated capital
+                    db.refresh(strategy)
+                else:
+                    logger.warning(f"⚠️ Could not sync strategy {strategy_id} capital with Alpaca account")
+                    # Continue anyway - don't block strategy start due to sync failure
                     
                 # Create typed strategy instance based on type
                 strategy_instance = self._create_typed_strategy_instance(strategy, db)

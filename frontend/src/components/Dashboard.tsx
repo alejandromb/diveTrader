@@ -1,5 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { 
+  Box, 
+  Container, 
+  Typography, 
+  Grid, 
+  Paper, 
+  Button, 
+  Card, 
+  CardContent, 
+  CardActions,
+  Chip,
+  CircularProgress,
+  Alert
+} from '@mui/material';
+import { 
+  Add as AddIcon, 
+  Assessment as AssessmentIcon, 
+  Sync as SyncIcon, 
+  Code as CodeIcon 
+} from '@mui/icons-material';
 import { API_CONFIG } from '../config/constants';
 import { apiV2, strategyHelpers } from '../services/apiV2';
 import type { Strategy, StrategyType } from '../types/api';
@@ -248,195 +268,266 @@ const Dashboard: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="loading">Loading DiveTrader...</div>;
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress size={60} />
+        <Typography variant="h6" sx={{ ml: 2 }}>Loading DiveTrader...</Typography>
+      </Box>
+    );
   }
 
   return (
-    <div className="dashboard">
-      <header className="dashboard-header">
-        <h1>🏊‍♂️ DiveTrader</h1>
-        <p>Automated Trading Platform</p>
-        
-        {/* Real Account Overview */}
-        {accountData && (
-          <div className="account-overview-header">
-            <div className="account-stats">
-              <div className="stat-item">
-                <span className="stat-label">Portfolio Value</span>
-                <span className="stat-value">${accountData.portfolio_value.toLocaleString()}</span>
-              </div>
-              <div className="stat-item cash-available">
-                <span className="stat-label">💰 Available Cash</span>
-                <span className="stat-value">${accountData.cash.toLocaleString()}</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-label">Equity</span>
-                <span className="stat-value">${accountData.equity.toLocaleString()}</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-label">Buying Power</span>
-                <span className="stat-value">${accountData.buying_power.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </header>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      {/* Header Section */}
+      <Paper elevation={2} sx={{ mb: 3 }}>
+        <Container maxWidth="xl" sx={{ py: 3 }}>
+          <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+            🏊‍♂️ DiveTrader
+          </Typography>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            Automated Trading Platform
+          </Typography>
+          
+          {/* Real Account Overview */}
+          {accountData && (
+            <Box sx={{ mt: 3, pt: 2, borderTop: '2px solid', borderColor: 'divider' }}>
+              <Grid container spacing={3} justifyContent="center">
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+                    <Typography variant="caption" color="text.secondary">Portfolio Value</Typography>
+                    <Typography variant="h5" fontWeight="bold">${accountData.portfolio_value.toLocaleString()}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={1} sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
+                    <Typography variant="caption">💰 Available Cash</Typography>
+                    <Typography variant="h5" fontWeight="bold">${accountData.cash.toLocaleString()}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+                    <Typography variant="caption" color="text.secondary">Equity</Typography>
+                    <Typography variant="h5" fontWeight="bold">${accountData.equity.toLocaleString()}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={1} sx={{ p: 2, textAlign: 'center' }}>
+                    <Typography variant="caption" color="text.secondary">Buying Power</Typography>
+                    <Typography variant="h5" fontWeight="bold">${accountData.buying_power.toLocaleString()}</Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </Container>
+      </Paper>
 
       <PriceTicker symbols={activeSymbols} refreshInterval={30000} />
 
-      <div className="dashboard-controls">
-        <button onClick={() => setShowCreateStrategy(true)} className="btn btn-primary">
-          + Create Strategy
-        </button>
-        <button 
-          onClick={() => setShowBacktest(true)} 
-          className="btn btn-secondary"
-          disabled={!selectedStrategy}
-        >
-          📊 Backtest
-        </button>
-        <button 
-          onClick={handleSyncAllCapitals} 
-          className="btn btn-secondary"
-          disabled={syncing}
-        >
-          {syncing ? '🔄 Syncing...' : '🔄 Sync with Alpaca'}
-        </button>
-        <button 
-          onClick={() => window.open('http://localhost:8000/docs', '_blank')} 
-          className="btn btn-secondary"
-        >
-          🔧 API Docs
-        </button>
-      </div>
+      {/* Dashboard Controls */}
+      <Container maxWidth="xl" sx={{ mb: 3 }}>
+        <Paper elevation={1} sx={{ p: 2 }}>
+          <Box display="flex" gap={2} flexWrap="wrap">
+            <Button 
+              variant="contained" 
+              startIcon={<AddIcon />}
+              onClick={() => setShowCreateStrategy(true)}
+            >
+              Create Strategy
+            </Button>
+            <Button 
+              variant="outlined" 
+              startIcon={<AssessmentIcon />}
+              onClick={() => setShowBacktest(true)}
+              disabled={!selectedStrategy}
+            >
+              Backtest
+            </Button>
+            <Button 
+              variant="outlined" 
+              startIcon={syncing ? <CircularProgress size={20} /> : <SyncIcon />}
+              onClick={handleSyncAllCapitals}
+              disabled={syncing}
+            >
+              {syncing ? 'Syncing...' : 'Sync with Alpaca'}
+            </Button>
+            <Button 
+              variant="outlined" 
+              startIcon={<CodeIcon />}
+              onClick={() => window.open('http://localhost:8000/docs', '_blank')}
+            >
+              API Docs
+            </Button>
+          </Box>
+        </Paper>
+      </Container>
 
-      <div className="dashboard-content">
-        <div className="left-column">
-          <div className="strategies-panel">
-            <h2>🎯 Active Trading Strategies</h2>
-            <div className="strategy-explanation">
-              <p className="explanation-text">
-                💡 Each strategy has allocated cash from your available balance for trading.
-              </p>
-            </div>
-            {strategies.length === 0 ? (
-              <div className="empty-state">
-                <p>No strategies yet. Create your first strategy!</p>
-              </div>
-            ) : (
-              strategies.map(strategy => (
-                <StrategyCard
-                  key={strategy.id}
-                  strategy={strategy}
-                  isSelected={selectedStrategy === strategy.id}
-                  onSelect={() => setSelectedStrategy(strategy.id)}
-                  onStart={() => startStrategy(strategy.id)}
-                  onStop={() => stopStrategy(strategy.id)}
-                  onDelete={() => deleteStrategy(strategy.id)}
-                  onViewLogs={() => showStrategyLogs(strategy.id, strategy.name)}
-                  onViewSettings={() => showStrategySettings(strategy.id, strategy.name)}
-                />
-              ))
-            )}
-          </div>
+      {/* Main Dashboard Content */}
+      <Container maxWidth="xl">
+        <Grid container spacing={3}>
+          {/* Left Column - Trading Strategies */}
+          <Grid item xs={12} lg={4}>
+            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                🎯 Active Trading Strategies
+              </Typography>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                💡 Strategies use your available cash (${accountData?.cash.toLocaleString() || '0'}) to execute trades automatically.
+              </Alert>
+              
+              {strategies.length === 0 ? (
+                <Box textAlign="center" py={4}>
+                  <Typography variant="body1" color="text.secondary">
+                    No strategies yet. Create your first strategy!
+                  </Typography>
+                </Box>
+              ) : (
+                <Box display="flex" flexDirection="column" gap={2}>
+                  {strategies.map(strategy => (
+                    <StrategyCard
+                      key={strategy.id}
+                      strategy={strategy}
+                      isSelected={selectedStrategy === strategy.id}
+                      onSelect={() => setSelectedStrategy(strategy.id)}
+                      onStart={() => startStrategy(strategy.id)}
+                      onStop={() => stopStrategy(strategy.id)}
+                      onDelete={() => deleteStrategy(strategy.id)}
+                      onViewLogs={() => showStrategyLogs(strategy.id, strategy.name)}
+                      onViewSettings={() => showStrategySettings(strategy.id, strategy.name)}
+                    />
+                  ))}
+                </Box>
+              )}
+            </Paper>
 
-          <AccountInfo accountData={accountData} loading={!accountData} />
-        </div>
+            <AccountInfo accountData={accountData} loading={!accountData} />
+          </Grid>
 
-        <div className="center-column">
-          <div className="performance-panel">
-            {selectedStrategy ? (
-              <>
-                <h2>📈 Strategy Performance</h2>
-                <div className="performance-info">
-                  <p className="performance-note">
+          {/* Center Column - Performance Metrics */}
+          <Grid item xs={12} lg={4}>
+            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+              {selectedStrategy ? (
+                <>
+                  <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    📈 Strategy Performance
+                  </Typography>
+                  <Alert severity="success" sx={{ mb: 3 }}>
                     🎯 Performance based on actual positions and trades for selected strategy
-                  </p>
-                </div>
-                <div className="metrics-grid">
+                  </Alert>
+                  
                   {(() => {
                     const strategy = strategies.find(s => s.id === selectedStrategy);
                     if (!strategy) return null;
                     
-                    // Calculate actual P&L from strategy positions
-                    const strategyPositions = positions.filter(p => true); // All positions for this strategy
-                    const actualPnL = strategyPositions.reduce((sum, pos) => sum + pos.unrealized_pnl, 0);
-                    const totalInvested = strategyPositions.reduce((sum, pos) => sum + (pos.quantity * pos.avg_price), 0);
+                    // For now, show all positions since we don't have proper strategy-position mapping
+                    const actualPnL = positions.reduce((sum, pos) => sum + pos.unrealized_pnl, 0);
+                    const totalInvested = positions.reduce((sum, pos) => sum + (pos.quantity * pos.avg_price), 0);
                     const actualROI = totalInvested > 0 ? (actualPnL / totalInvested) * 100 : 0;
                     
                     return (
-                      <>
-                        <div className="metric-card">
-                          <h3>Actual ROI</h3>
-                          <p className={actualROI >= 0 ? 'positive' : 'negative'}>
-                            {actualROI.toFixed(2)}%
-                          </p>
-                        </div>
-                        <div className="metric-card">
-                          <h3>Unrealized P&L</h3>
-                          <p className={actualPnL >= 0 ? 'positive' : 'negative'}>
-                            ${actualPnL.toFixed(2)}
-                          </p>
-                        </div>
-                        <div className="metric-card">
-                          <h3>Cash Allocation</h3>
-                          <p>${strategy.initial_capital.toLocaleString()}</p>
-                        </div>
-                        <div className="metric-card">
-                          <h3>Total Trades</h3>
-                          <p>{performance?.total_trades || 0}</p>
-                        </div>
-                        <div className="metric-card">
-                          <h3>Win Rate</h3>
-                          <p>{performance?.win_rate?.toFixed(1) || '0.0'}%</p>
-                        </div>
-                        <div className="metric-card">
-                          <h3>Active Positions</h3>
-                          <p>{strategyPositions.length}</p>
-                        </div>
-                      </>
+                      <Grid container spacing={2} sx={{ mb: 3 }}>
+                        <Grid item xs={6}>
+                          <Card elevation={1}>
+                            <CardContent sx={{ textAlign: 'center' }}>
+                              <Typography variant="caption" color="text.secondary">Portfolio ROI</Typography>
+                              <Typography variant="h6" color={actualROI >= 0 ? 'success.main' : 'error.main'}>
+                                {actualROI.toFixed(2)}%
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Card elevation={1}>
+                            <CardContent sx={{ textAlign: 'center' }}>
+                              <Typography variant="caption" color="text.secondary">Unrealized P&L</Typography>
+                              <Typography variant="h6" color={actualPnL >= 0 ? 'success.main' : 'error.main'}>
+                                ${actualPnL.toFixed(2)}
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Card elevation={1}>
+                            <CardContent sx={{ textAlign: 'center' }}>
+                              <Typography variant="caption" color="text.secondary">Available Cash</Typography>
+                              <Typography variant="h6">${accountData?.cash.toLocaleString() || '0'}</Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Card elevation={1}>
+                            <CardContent sx={{ textAlign: 'center' }}>
+                              <Typography variant="caption" color="text.secondary">Total Trades</Typography>
+                              <Typography variant="h6">{performance?.total_trades || 0}</Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Card elevation={1}>
+                            <CardContent sx={{ textAlign: 'center' }}>
+                              <Typography variant="caption" color="text.secondary">Win Rate</Typography>
+                              <Typography variant="h6">{performance?.win_rate?.toFixed(1) || '0.0'}%</Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Card elevation={1}>
+                            <CardContent sx={{ textAlign: 'center' }}>
+                              <Typography variant="caption" color="text.secondary">Active Positions</Typography>
+                              <Typography variant="h6">{positions.length}</Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      </Grid>
                     );
                   })()}
-                </div>
 
-                <div className="chart-container">
-                  <h3>Performance Chart</h3>
-                  <PerformanceChart data={chartData} />
-                </div>
-              </>
-            ) : (
-              <div className="empty-performance">
-                <p>Select a strategy to view performance</p>
-              </div>
-            )}
-          </div>
-        </div>
+                  <Card elevation={1}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>Performance Chart</Typography>
+                      <PerformanceChart data={chartData} />
+                    </CardContent>
+                  </Card>
+                </>
+              ) : (
+                <Box textAlign="center" py={4}>
+                  <Typography variant="body1" color="text.secondary">
+                    Select a strategy to view performance
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+          </Grid>
 
-        <div className="right-column">
-          <RiskManagementPanel 
-            strategyId={selectedStrategy}
-            refreshInterval={30000}
-          />
-          
-          <PositionsPanel 
-            positions={positions} 
-            loading={selectedStrategy ? false : true} 
-          />
-          
-          <EnhancedTradesPanel 
-            trades={trades} 
-            loading={selectedStrategy ? false : true} 
-          />
-          
-          {selectedStrategy && (
-            <TradeAnalytics 
-              trades={trades}
-              currentCapital={strategies.find(s => s.id === selectedStrategy)?.current_capital || 0}
-              initialCapital={strategies.find(s => s.id === selectedStrategy)?.initial_capital || 0}
-            />
-          )}
-        </div>
-      </div>
+          {/* Right Column - Risk Management & Positions */}
+          <Grid item xs={12} lg={4}>
+            <Box display="flex" flexDirection="column" gap={3}>
+              <RiskManagementPanel 
+                strategyId={selectedStrategy}
+                refreshInterval={30000}
+              />
+              
+              <PositionsPanel 
+                positions={positions} 
+                loading={selectedStrategy ? false : true} 
+              />
+              
+              <EnhancedTradesPanel 
+                trades={trades} 
+                loading={selectedStrategy ? false : true} 
+              />
+              
+              {selectedStrategy && (
+                <TradeAnalytics 
+                  trades={trades}
+                  currentCapital={strategies.find(s => s.id === selectedStrategy)?.current_capital || 0}
+                  initialCapital={strategies.find(s => s.id === selectedStrategy)?.initial_capital || 0}
+                />
+              )}
+            </Box>
+          </Grid>
+        </Grid>
+      </Container>
 
       {showBacktest && selectedStrategy && (
         <BacktestModal
@@ -479,7 +570,7 @@ const Dashboard: React.FC = () => {
           onSettingsUpdated={onTypedSettingsUpdated}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

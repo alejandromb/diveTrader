@@ -1,5 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { Strategy } from '../types/api';
+import {
+  Card,
+  CardContent,
+  CardActions,
+  Typography,
+  Button,
+  Chip,
+  Box,
+  IconButton,
+  Menu,
+  MenuItem,
+  Divider
+} from '@mui/material';
+import {
+  PlayArrow as PlayIcon,
+  Stop as StopIcon,
+  Settings as SettingsIcon,
+  Assignment as LogsIcon,
+  MoreVert as MoreIcon,
+  Delete as DeleteIcon,
+  MonetizationOn as CryptoIcon,
+  TrendingUp as TrendingUpIcon
+} from '@mui/icons-material';
+import type { Strategy, BTCScalpingSettings, PortfolioDistributorSettings } from '../types/api';
+import { apiV2 } from '../services/apiV2';
 
 interface StrategyCardProps {
   strategy: Strategy;
@@ -22,25 +46,51 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
   onViewLogs,
   onViewSettings
 }) => {
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [btcSettings, setBtcSettings] = useState<BTCScalpingSettings | null>(null);
+  const [portfolioSettings, setPortfolioSettings] = useState<PortfolioDistributorSettings | null>(null);
+  const menuOpen = Boolean(anchorEl);
 
-  // Close dropdown when clicking outside
+  // Load strategy settings
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
+    const loadSettings = async () => {
+      try {
+        if (strategy.strategy_type === 'btc_scalping') {
+          const settings = await apiV2.getBTCSettings(strategy.id);
+          setBtcSettings(settings);
+        } else if (strategy.strategy_type === 'portfolio_distributor') {
+          const settings = await apiV2.getPortfolioSettings(strategy.id);
+          setPortfolioSettings(settings);
+        }
+      } catch (error) {
+        console.error('Error loading strategy settings:', error);
+        // Set default values on error
+        if (strategy.strategy_type === 'btc_scalping') {
+          setBtcSettings({
+            strategy_id: strategy.id,
+            position_size: 0.001,
+            max_positions: 5
+          });
+        } else if (strategy.strategy_type === 'portfolio_distributor') {
+          setPortfolioSettings({
+            strategy_id: strategy.id,
+            investment_amount: 500,
+            max_position_size: 200
+          });
+        }
       }
     };
 
-    if (showDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    loadSettings();
+  }, [strategy.id, strategy.strategy_type]);
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showDropdown]);
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
 
   const getStrategyIcon = (type: string) => {
     switch (type) {
@@ -76,64 +126,95 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
   };
 
   return (
-    <div 
-      className={`strategy-card ${isSelected ? 'selected' : ''}`}
+    <Card 
+      elevation={isSelected ? 4 : 1}
+      sx={{ 
+        cursor: 'pointer',
+        border: isSelected ? 2 : 0,
+        borderColor: 'primary.main',
+        '&:hover': { elevation: 3 }
+      }}
       onClick={onSelect}
     >
-      <div className="strategy-header">
-        <div className="strategy-icon">
-          {getStrategyIcon(strategy.strategy_type)}
-        </div>
-        <div className="strategy-info">
-          <h4>{strategy.name}</h4>
-          <p className="strategy-type">
-            {strategy.strategy_type.replace('_', ' ').toUpperCase()}
-          </p>
-        </div>
-        <div 
-          className="strategy-status"
-          style={{ color: getStrategyStatus(strategy).color }}
-          title={getStrategyStatus(strategy).description}
-        >
-          {getStrategyStatus(strategy).text}
-        </div>
-      </div>
+      <CardContent>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+          <Box display="flex" alignItems="center" gap={1}>
+            {strategy.strategy_type === 'btc_scalping' ? <CryptoIcon color="warning" /> : <TrendingUpIcon color="primary" />}
+            <Box>
+              <Typography variant="h6" component="h3">
+                {strategy.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {strategy.strategy_type.replace('_', ' ').toUpperCase()}
+              </Typography>
+            </Box>
+          </Box>
+          
+          <Chip 
+            label={strategy.is_running ? 'Running' : 'Stopped'}
+            color={strategy.is_running ? 'success' : 'default'}
+            size="small"
+            variant={strategy.is_running ? 'filled' : 'outlined'}
+          />
+        </Box>
 
-      <div className="strategy-metrics">
-        <div className="metric">
-          <span className="label">💰 Cash Allocation:</span>
-          <span className="value">${strategy.initial_capital.toLocaleString()}</span>
-        </div>
-        <div className="metric">
-          <span className="label">📈 Strategy P&L:</span>
-          <span className={`value ${strategy.current_capital >= strategy.initial_capital ? 'positive' : 'negative'}`}>
-            ${(strategy.current_capital - strategy.initial_capital).toLocaleString()} 
-            ({(((strategy.current_capital - strategy.initial_capital) / strategy.initial_capital) * 100).toFixed(1)}%)
-          </span>
-        </div>
-        <div className="metric">
-          <span className="label">📅 Created:</span>
-          <span className="value">
-            {new Date(strategy.created_at).toLocaleDateString()}
-          </span>
-        </div>
-      </div>
+        <Box display="flex" flexDirection="column" gap={1}>
+          <Box display="flex" justifyContent="space-between">
+            <Typography variant="body2" color="text.secondary">💰 Max Budget:</Typography>
+            <Typography variant="body2" fontWeight="medium">
+              {strategy.strategy_type === 'btc_scalping' && btcSettings ? 
+                `${btcSettings.max_positions || 5} positions` :
+               strategy.strategy_type === 'portfolio_distributor' && portfolioSettings ? 
+                `$${portfolioSettings.investment_amount || 0}` :
+               'Loading...'}
+            </Typography>
+          </Box>
+          
+          <Box display="flex" justifyContent="space-between">
+            <Typography variant="body2" color="text.secondary">🎯 Trade Size:</Typography>
+            <Typography variant="body2" fontWeight="medium">
+              {strategy.strategy_type === 'btc_scalping' && btcSettings ? 
+                `${btcSettings.position_size || 0.001} BTC` :
+               strategy.strategy_type === 'portfolio_distributor' && portfolioSettings ? 
+                `$${Math.max(portfolioSettings.max_position_size || 100, 100)} max` :
+               'Loading...'}
+            </Typography>
+          </Box>
+          
+          <Box display="flex" justifyContent="space-between">
+            <Typography variant="body2" color="text.secondary">📊 Status:</Typography>
+            <Typography 
+              variant="body2" 
+              fontWeight="medium"
+              color={strategy.is_running ? 'success.main' : 'text.primary'}
+            >
+              {strategy.is_running ? 'Active & Trading' : 'Ready to Trade'}
+            </Typography>
+          </Box>
+        </Box>
+      </CardContent>
 
-      <div className="strategy-actions">
-        <div className="left-actions">
+      <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
+        <Box display="flex" gap={1}>
           {strategy.is_running ? (
-            <button 
-              className="btn btn-danger"
+            <Button 
+              variant="contained"
+              color="error"
+              size="small"
+              startIcon={<StopIcon />}
               onClick={(e) => {
                 e.stopPropagation();
                 onStop();
               }}
             >
-              Stop Strategy
-            </button>
+              Stop
+            </Button>
           ) : (
-            <button 
-              className="btn btn-success"
+            <Button 
+              variant="contained"
+              color="success"
+              size="small"
+              startIcon={<PlayIcon />}
               onClick={(e) => {
                 e.stopPropagation();
                 onStart();
@@ -141,109 +222,71 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
               disabled={!strategy.is_active}
               title={!strategy.is_active ? "Strategy must be enabled first" : "Start executing trades"}
             >
-              Start Strategy
-            </button>
+              Start
+            </Button>
           )}
           
           {onViewLogs && (
-            <button 
-              className="btn btn-outline-info btn-sm"
+            <IconButton 
+              size="small"
+              color="primary"
               onClick={(e) => {
                 e.stopPropagation();
                 onViewLogs();
               }}
               title="View Event Logs"
             >
-              📋
-            </button>
+              <LogsIcon />
+            </IconButton>
           )}
-        </div>
+        </Box>
         
-        <div className="right-actions" style={{ position: 'relative' }} ref={dropdownRef}>
-          <button 
-            className="btn btn-outline-secondary btn-sm"
+        <IconButton 
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleMenuClick(e);
+          }}
+          title="More Actions"
+        >
+          <MoreIcon />
+        </IconButton>
+        
+        <Menu
+          anchorEl={anchorEl}
+          open={menuOpen}
+          onClose={handleMenuClose}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onViewSettings && (
+            <MenuItem onClick={(e) => {
+              e.stopPropagation();
+              handleMenuClose();
+              onViewSettings();
+            }}>
+              <SettingsIcon sx={{ mr: 1 }} />
+              Settings
+            </MenuItem>
+          )}
+          
+          <Divider />
+          
+          <MenuItem 
             onClick={(e) => {
               e.stopPropagation();
-              setShowDropdown(!showDropdown);
+              handleMenuClose();
+              if (window.confirm(`Are you sure you want to delete "${strategy.name}"?`)) {
+                onDelete();
+              }
             }}
-            title="More Actions"
-            style={{ padding: '4px 8px' }}
+            sx={{ color: 'error.main' }}
           >
-            ⋮
-          </button>
-          
-          {showDropdown && (
-            <div 
-              className="dropdown-menu"
-              style={{
-                position: 'absolute',
-                top: '100%',
-                right: '0',
-                backgroundColor: 'white',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                zIndex: 1000,
-                minWidth: '150px',
-                padding: '4px 0'
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {onViewSettings && (
-                <button
-                  className="dropdown-item"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDropdown(false);
-                    onViewSettings();
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 16px',
-                    border: 'none',
-                    background: 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                  onMouseOver={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-                  onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
-                >
-                  ⚙️ Settings
-                </button>
-              )}
-              
-              <div style={{ height: '1px', backgroundColor: '#eee', margin: '4px 0' }} />
-              
-              <button
-                className="dropdown-item"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowDropdown(false);
-                  if (window.confirm(`Are you sure you want to delete "${strategy.name}"?`)) {
-                    onDelete();
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px 16px',
-                  border: 'none',
-                  background: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  color: '#dc3545'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-                onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
-              >
-                🗑️ Delete
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+            <DeleteIcon sx={{ mr: 1 }} />
+            Delete
+          </MenuItem>
+        </Menu>
+      </CardActions>
+    </Card>
   );
 };
 

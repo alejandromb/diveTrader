@@ -46,17 +46,13 @@ class EnhancedBacktestingService:
                                   days_back: int, initial_capital: float) -> Dict:
         """Enhanced BTC scalping backtest with fallback data"""
         try:
-            # Force synthetic data for testing (TEMPORARY)
-            bars_data = self._generate_synthetic_btc_data(days_back)
-            logger.info("Using synthetic data for comprehensive backtesting test")
+            # Get historical data with fallback
+            bars_data = self._get_crypto_data_with_fallback(symbol, days_back)
             
-            # Get historical data with fallback (commented out for testing)
-            # bars_data = self._get_crypto_data_with_fallback(symbol, days_back)
-            
-            # if bars_data is None or len(bars_data) < 20:
-            #     # Generate synthetic data for demonstration
-            #     bars_data = self._generate_synthetic_btc_data(days_back)
-            #     logger.warning("Using synthetic data for backtesting demonstration")
+            if bars_data is None or len(bars_data) < 20:
+                # Generate synthetic data for demonstration
+                bars_data = self._generate_synthetic_btc_data(days_back)
+                logger.warning("Using synthetic data for backtesting demonstration")
             
             # Run enhanced strategy simulation
             results = self._simulate_btc_scalping_strategy(bars_data, strategy_config, initial_capital)

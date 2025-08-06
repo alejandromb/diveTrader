@@ -23,8 +23,12 @@ echo.
 echo 🚀 Starting Backend API Server...
 cd backend
 
-REM Start backend in new window
-start "DiveTrader Backend" cmd /c "python main.py"
+REM Activate virtual environment and start backend in new window
+if exist "venv\Scripts\activate.bat" (
+    start "DiveTrader Backend" cmd /c "venv\Scripts\activate.bat && python main.py"
+) else (
+    start "DiveTrader Backend" cmd /c "python main.py"
+)
 
 cd ..
 

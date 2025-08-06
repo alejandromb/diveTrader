@@ -12,13 +12,20 @@ import {
   CardActions,
   Chip,
   CircularProgress,
-  Alert
+  Alert,
+  Tabs,
+  Tab,
+  AppBar
 } from '@mui/material';
 import { 
   Add as AddIcon, 
   Assessment as AssessmentIcon, 
   Sync as SyncIcon, 
-  Code as CodeIcon 
+  Code as CodeIcon,
+  Dashboard as DashboardIcon,
+  TrendingUp as TrendingUpIcon,
+  AccountBalance as AccountBalanceIcon,
+  Security as SecurityIcon
 } from '@mui/icons-material';
 import { API_CONFIG } from '../config/constants';
 import { apiV2, strategyHelpers } from '../services/apiV2';
@@ -37,8 +44,6 @@ import StrategyEventLogsModal from './StrategyEventLogsModal';
 import StrategySettingsModal from './StrategySettingsModal';
 import TypedSettingsModal from './TypedSettingsModal';
 import ManualTradingPanel from './ManualTradingPanel';
-import './Dashboard.css';
-import './EnhancedStyles.css';
 
 // Using Strategy type from ../types/api.ts
 
@@ -88,6 +93,39 @@ interface Trade {
 // ✅ FIXED: Now using centralized config with proper Vite env vars
 const API_BASE = API_CONFIG.BASE_URL;
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`dashboard-tabpanel-${index}`}
+      aria-labelledby={`dashboard-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ py: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `dashboard-tab-${index}`,
+    'aria-controls': `dashboard-tabpanel-${index}`,
+  };
+}
+
 const Dashboard: React.FC = () => {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [selectedStrategy, setSelectedStrategy] = useState<number | null>(null);
@@ -109,6 +147,7 @@ const Dashboard: React.FC = () => {
   const [selectedTypedStrategy, setSelectedTypedStrategy] = useState<Strategy | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [activeSymbols] = useState<string[]>(['BTC/USD', 'AAPL', 'TSLA', 'SPY']);
+  const [currentTab, setCurrentTab] = useState(0);
 
   useEffect(() => {
     fetchStrategies();
@@ -268,6 +307,10 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
@@ -280,7 +323,7 @@ const Dashboard: React.FC = () => {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       {/* Header Section */}
-      <Paper elevation={2} sx={{ mb: 3 }}>
+      <Paper elevation={2} sx={{ mb: 0 }}>
         <Container maxWidth="xl" sx={{ py: 3 }}>
           <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
             🏊‍♂️ DiveTrader
@@ -288,11 +331,61 @@ const Dashboard: React.FC = () => {
           <Typography variant="h6" color="text.secondary" gutterBottom>
             Automated Trading Platform
           </Typography>
+        </Container>
+      </Paper>
+
+      {/* Navigation Tabs */}
+      <AppBar position="static" color="default" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
+        <Container maxWidth="xl">
+          <Tabs 
+            value={currentTab} 
+            onChange={handleTabChange} 
+            aria-label="dashboard tabs"
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+          >
+            <Tab 
+              icon={<DashboardIcon />} 
+              label="Overview" 
+              {...a11yProps(0)} 
+              sx={{ minWidth: { xs: 'auto', sm: 160 } }}
+            />
+            <Tab 
+              icon={<TrendingUpIcon />} 
+              label="Strategies" 
+              {...a11yProps(1)} 
+              sx={{ minWidth: { xs: 'auto', sm: 160 } }}
+            />
+            <Tab 
+              icon={<AccountBalanceIcon />} 
+              label="Positions & Trades" 
+              {...a11yProps(2)} 
+              sx={{ minWidth: { xs: 'auto', sm: 160 } }}
+            />
+            <Tab 
+              icon={<SecurityIcon />} 
+              label="Risk Management" 
+              {...a11yProps(3)} 
+              sx={{ minWidth: { xs: 'auto', sm: 160 } }}
+            />
+          </Tabs>
+        </Container>
+      </AppBar>
+
+      {/* Tab Content */}
+      <Container maxWidth="xl">
+        {/* Tab Panel 0: Overview */}
+        <TabPanel value={currentTab} index={0}>
+          <PriceTicker symbols={activeSymbols} refreshInterval={30000} />
           
-          {/* Real Account Overview */}
+          {/* Account Overview */}
           {accountData && (
-            <Box sx={{ mt: 3, pt: 2, borderTop: '2px solid', borderColor: 'divider' }}>
-              <Grid container spacing={3} justifyContent="center">
+            <Paper elevation={2} sx={{ mb: 3, p: 3 }}>
+              <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                🏦 Account Overview
+              </Typography>
+              <Grid container spacing={3}>
                 <Grid item xs={6} sm={3}>
                   <Paper elevation={1} sx={{ p: 2, textAlign: 'center' }}>
                     <Typography variant="caption" color="text.secondary">Portfolio Value</Typography>
@@ -318,223 +411,214 @@ const Dashboard: React.FC = () => {
                   </Paper>
                 </Grid>
               </Grid>
-            </Box>
+            </Paper>
           )}
-        </Container>
-      </Paper>
 
-      <PriceTicker symbols={activeSymbols} refreshInterval={30000} />
-
-      {/* Dashboard Controls */}
-      <Container maxWidth="xl" sx={{ mb: 3 }}>
-        <Paper elevation={1} sx={{ p: 2 }}>
-          <Box display="flex" gap={2} flexWrap="wrap">
-            <Button 
-              variant="contained" 
-              startIcon={<AddIcon />}
-              onClick={() => setShowCreateStrategy(true)}
-            >
-              Create Strategy
-            </Button>
-            <Button 
-              variant="outlined" 
-              startIcon={<AssessmentIcon />}
-              onClick={() => setShowBacktest(true)}
-              disabled={!selectedStrategy}
-            >
-              Backtest
-            </Button>
-            <Button 
-              variant="outlined" 
-              startIcon={syncing ? <CircularProgress size={20} /> : <SyncIcon />}
-              onClick={handleSyncAllCapitals}
-              disabled={syncing}
-            >
-              {syncing ? 'Syncing...' : 'Sync with Alpaca'}
-            </Button>
-            <Button 
-              variant="outlined" 
-              startIcon={<CodeIcon />}
-              onClick={() => window.open('http://localhost:8000/docs', '_blank')}
-            >
-              API Docs
-            </Button>
-          </Box>
-        </Paper>
-      </Container>
-
-      {/* Main Dashboard Content */}
-      <Container maxWidth="xl">
-        <Grid container spacing={3}>
-          {/* Left Column - Trading Strategies */}
-          <Grid item xs={12} lg={4}>
-            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-              <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                🎯 Active Trading Strategies
-              </Typography>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                💡 Strategies use your available cash (${accountData?.cash.toLocaleString() || '0'}) to execute trades automatically.
-              </Alert>
-              
-              {strategies.length === 0 ? (
-                <Box textAlign="center" py={4}>
-                  <Typography variant="body1" color="text.secondary">
-                    No strategies yet. Create your first strategy!
-                  </Typography>
-                </Box>
-              ) : (
-                <Box display="flex" flexDirection="column" gap={2}>
-                  {strategies.map(strategy => (
-                    <StrategyCard
-                      key={strategy.id}
-                      strategy={strategy}
-                      isSelected={selectedStrategy === strategy.id}
-                      onSelect={() => setSelectedStrategy(strategy.id)}
-                      onStart={() => startStrategy(strategy.id)}
-                      onStop={() => stopStrategy(strategy.id)}
-                      onDelete={() => deleteStrategy(strategy.id)}
-                      onViewLogs={() => showStrategyLogs(strategy.id, strategy.name)}
-                      onViewSettings={() => showStrategySettings(strategy.id, strategy.name)}
-                    />
-                  ))}
-                </Box>
-              )}
-            </Paper>
-
-            <AccountInfo accountData={accountData} loading={!accountData} />
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={8}>
+              <AccountInfo accountData={accountData} loading={!accountData} />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <ManualTradingPanel />
+            </Grid>
           </Grid>
+        </TabPanel>
 
-          {/* Center Column - Performance Metrics */}
-          <Grid item xs={12} lg={4}>
-            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-              {selectedStrategy ? (
-                <>
-                  <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                    📈 Strategy Performance
-                  </Typography>
-                  <Alert severity="success" sx={{ mb: 3 }}>
-                    🎯 Performance based on actual positions and trades for selected strategy
-                  </Alert>
-                  
-                  {(() => {
-                    const strategy = strategies.find(s => s.id === selectedStrategy);
-                    if (!strategy) return null;
-                    
-                    // For now, show all positions since we don't have proper strategy-position mapping
-                    const actualPnL = positions.reduce((sum, pos) => sum + pos.unrealized_pnl, 0);
-                    const totalInvested = positions.reduce((sum, pos) => sum + (pos.quantity * pos.avg_price), 0);
-                    const actualROI = totalInvested > 0 ? (actualPnL / totalInvested) * 100 : 0;
-                    
-                    return (
-                      <Grid container spacing={2} sx={{ mb: 3 }}>
-                        <Grid item xs={6}>
-                          <Card elevation={1}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                              <Typography variant="caption" color="text.secondary">Portfolio ROI</Typography>
-                              <Typography variant="h6" color={actualROI >= 0 ? 'success.main' : 'error.main'}>
-                                {actualROI.toFixed(2)}%
-                              </Typography>
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Card elevation={1}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                              <Typography variant="caption" color="text.secondary">Unrealized P&L</Typography>
-                              <Typography variant="h6" color={actualPnL >= 0 ? 'success.main' : 'error.main'}>
-                                ${actualPnL.toFixed(2)}
-                              </Typography>
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Card elevation={1}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                              <Typography variant="caption" color="text.secondary">Available Cash</Typography>
-                              <Typography variant="h6">${accountData?.cash.toLocaleString() || '0'}</Typography>
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Card elevation={1}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                              <Typography variant="caption" color="text.secondary">Total Trades</Typography>
-                              <Typography variant="h6">{performance?.total_trades || 0}</Typography>
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Card elevation={1}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                              <Typography variant="caption" color="text.secondary">Win Rate</Typography>
-                              <Typography variant="h6">{performance?.win_rate?.toFixed(1) || '0.0'}%</Typography>
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Card elevation={1}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                              <Typography variant="caption" color="text.secondary">Active Positions</Typography>
-                              <Typography variant="h6">{positions.length}</Typography>
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                      </Grid>
-                    );
-                  })()}
+        {/* Tab Panel 1: Strategies */}
+        <TabPanel value={currentTab} index={1}>
+          {/* Dashboard Controls */}
+          <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+            <Box display="flex" gap={2} flexWrap="wrap">
+              <Button 
+                variant="contained" 
+                startIcon={<AddIcon />}
+                onClick={() => setShowCreateStrategy(true)}
+              >
+                Create Strategy
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<AssessmentIcon />}
+                onClick={() => setShowBacktest(true)}
+                disabled={!selectedStrategy}
+              >
+                Backtest
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={syncing ? <CircularProgress size={20} /> : <SyncIcon />}
+                onClick={handleSyncAllCapitals}
+                disabled={syncing}
+              >
+                {syncing ? 'Syncing...' : 'Sync with Alpaca'}
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<CodeIcon />}
+                onClick={() => window.open('http://localhost:8000/docs', '_blank')}
+              >
+                API Docs
+              </Button>
+            </Box>
+          </Paper>
 
-                  <Card elevation={1}>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>Performance Chart</Typography>
-                      <PerformanceChart data={chartData} />
-                    </CardContent>
-                  </Card>
-                </>
-              ) : (
-                <Box textAlign="center" py={4}>
-                  <Typography variant="body1" color="text.secondary">
-                    Select a strategy to view performance
-                  </Typography>
-                </Box>
-              )}
-            </Paper>
+          <Grid container spacing={3}>
+            {/* Strategies List */}
+            <Grid item xs={12} xl={6}>
+              <Paper elevation={2} sx={{ p: 3 }}>
+                <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                  🎯 Active Trading Strategies
+                </Typography>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  💡 Strategies use your available cash (${accountData?.cash.toLocaleString() || '0'}) to execute trades automatically.
+                </Alert>
+                
+                {strategies.length === 0 ? (
+                  <Box textAlign="center" py={4}>
+                    <Typography variant="body1" color="text.secondary">
+                      No strategies yet. Create your first strategy!
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box display="flex" flexDirection="column" gap={2}>
+                    {strategies.map(strategy => (
+                      <StrategyCard
+                        key={strategy.id}
+                        strategy={strategy}
+                        isSelected={selectedStrategy === strategy.id}
+                        onSelect={() => setSelectedStrategy(strategy.id)}
+                        onStart={() => startStrategy(strategy.id)}
+                        onStop={() => stopStrategy(strategy.id)}
+                        onDelete={() => deleteStrategy(strategy.id)}
+                        onViewLogs={() => showStrategyLogs(strategy.id, strategy.name)}
+                        onViewSettings={() => showStrategySettings(strategy.id, strategy.name)}
+                      />
+                    ))}
+                  </Box>
+                )}
+              </Paper>
+            </Grid>
+
+            {/* Performance Metrics */}
+            <Grid item xs={12} xl={6}>
+              <Paper elevation={2} sx={{ p: 3 }}>
+                {selectedStrategy ? (
+                  <>
+                    <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                      📈 Strategy Performance
+                    </Typography>
+                    <Alert severity="success" sx={{ mb: 3 }}>
+                      🎯 Performance based on actual positions and trades for selected strategy
+                    </Alert>
+                    
+                    {(() => {
+                      const strategy = strategies.find(s => s.id === selectedStrategy);
+                      if (!strategy) return null;
+                      
+                      // For now, show all positions since we don't have proper strategy-position mapping
+                      const actualPnL = positions.reduce((sum, pos) => sum + pos.unrealized_pnl, 0);
+                      const totalInvested = positions.reduce((sum, pos) => sum + (pos.quantity * pos.avg_price), 0);
+                      const actualROI = totalInvested > 0 ? (actualPnL / totalInvested) * 100 : 0;
+                      
+                      return (
+                        <Grid container spacing={2} sx={{ mb: 3 }}>
+                          <Grid item xs={6}>
+                            <Card elevation={1}>
+                              <CardContent sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary">Portfolio ROI</Typography>
+                                <Typography variant="h6" color={actualROI >= 0 ? 'success.main' : 'error.main'}>
+                                  {actualROI.toFixed(2)}%
+                                </Typography>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Card elevation={1}>
+                              <CardContent sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary">Unrealized P&L</Typography>
+                                <Typography variant="h6" color={actualPnL >= 0 ? 'success.main' : 'error.main'}>
+                                  ${actualPnL.toFixed(2)}
+                                </Typography>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Card elevation={1}>
+                              <CardContent sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary">Total Trades</Typography>
+                                <Typography variant="h6">{performance?.total_trades || 0}</Typography>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Card elevation={1}>
+                              <CardContent sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary">Win Rate</Typography>
+                                <Typography variant="h6">{performance?.win_rate?.toFixed(1) || '0.0'}%</Typography>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        </Grid>
+                      );
+                    })()}
+
+                    <Card elevation={1}>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom>Performance Chart</Typography>
+                        <PerformanceChart data={chartData} />
+                      </CardContent>
+                    </Card>
+                  </>
+                ) : (
+                  <Box textAlign="center" py={4}>
+                    <Typography variant="body1" color="text.secondary">
+                      Select a strategy to view performance
+                    </Typography>
+                  </Box>
+                )}
+              </Paper>
+            </Grid>
           </Grid>
+        </TabPanel>
 
-          {/* Right Column - Risk Management & Positions */}
-          <Grid item xs={12} lg={4}>
-            <Box display="flex" flexDirection="column" gap={3}>
-              <RiskManagementPanel 
-                strategyId={selectedStrategy}
-                refreshInterval={30000}
-              />
-              
+        {/* Tab Panel 2: Positions & Trades */}
+        <TabPanel value={currentTab} index={2}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} xl={6}>
               <PositionsPanel 
                 positions={positions} 
                 loading={selectedStrategy ? false : true} 
               />
-              
-              <EnhancedTradesPanel 
-                trades={trades} 
-                loading={selectedStrategy ? false : true} 
-              />
-              
-              {selectedStrategy && (
-                <TradeAnalytics 
-                  trades={trades}
-                  currentCapital={strategies.find(s => s.id === selectedStrategy)?.current_capital || 0}
-                  initialCapital={strategies.find(s => s.id === selectedStrategy)?.initial_capital || 0}
+            </Grid>
+            <Grid item xs={12} xl={6}>
+              <Box display="flex" flexDirection="column" gap={3}>
+                <EnhancedTradesPanel 
+                  trades={trades} 
+                  loading={selectedStrategy ? false : true} 
                 />
-              )}
-            </Box>
+                
+                {selectedStrategy && (
+                  <TradeAnalytics 
+                    trades={trades}
+                    currentCapital={strategies.find(s => s.id === selectedStrategy)?.current_capital || 0}
+                    initialCapital={strategies.find(s => s.id === selectedStrategy)?.initial_capital || 0}
+                  />
+                )}
+              </Box>
+            </Grid>
           </Grid>
-        </Grid>
+        </TabPanel>
+
+        {/* Tab Panel 3: Risk Management */}
+        <TabPanel value={currentTab} index={3}>
+          <RiskManagementPanel 
+            strategyId={selectedStrategy}
+            refreshInterval={30000}
+          />
+        </TabPanel>
       </Container>
 
-      {/* Manual Trading Section */}
-      <Container maxWidth="xl" sx={{ mt: 3 }}>
-        <ManualTradingPanel />
-      </Container>
-
+      {/* Modals */}
       {showBacktest && selectedStrategy && (
         <BacktestModal
           strategyId={selectedStrategy}
@@ -567,7 +651,6 @@ const Dashboard: React.FC = () => {
         />
       )}
 
-      {/* Typed Settings Modal */}
       {selectedTypedStrategy && (
         <TypedSettingsModal
           strategy={selectedTypedStrategy}

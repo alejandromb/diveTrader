@@ -105,8 +105,18 @@ class EnhancedBacktestingService:
             investment_frequency = portfolio_config.get('investment_frequency', 'weekly')
             investment_amount = portfolio_config.get('investment_amount', 1000)
             
+            logger.info(f"Getting stock data for symbols: {symbols}")
+            
             # Get historical data for all symbols
             stock_data = self._get_portfolio_data_with_fallback(symbols, days_back)
+            
+            # Log data availability
+            for symbol in symbols:
+                data = stock_data.get(symbol)
+                if data is not None and len(data) > 0:
+                    logger.info(f"✅ {symbol}: {len(data)} data points, price range ${data['close'].min():.2f}-${data['close'].max():.2f}")
+                else:
+                    logger.warning(f"❌ {symbol}: No data available")
             
             # Simulate portfolio strategy
             results = self._simulate_portfolio_strategy(
@@ -495,38 +505,81 @@ class EnhancedBacktestingService:
             # Calculate investment schedule
             investment_days = self._calculate_investment_schedule(investment_frequency, days_back)
             
+            # Use print statements to ensure we see output
+            print(f"\n{'='*50}")
+            print(f"🎯 PORTFOLIO BACKTEST START")
+            print(f"Symbols: {symbols}")
+            print(f"Investment days: {investment_days} (total: {len(investment_days)} investments)")
+            print(f"Investment frequency: {investment_frequency}, Amount: ${investment_amount}")
+            print(f"Allocation weights: {allocation_weights}")
+            print(f"Initial capital: ${initial_capital}")
+            print(f"{'='*50}")
+            
+            logger.info(f"=== PORTFOLIO BACKTEST START ===")
+            logger.info(f"Symbols: {symbols}")
+            logger.info(f"Investment days: {investment_days} (total: {len(investment_days)} investments)")
+            logger.info(f"Investment frequency: {investment_frequency}, Amount: ${investment_amount}")
+            logger.info(f"Allocation weights: {allocation_weights}")
+            logger.info(f"Initial capital: ${initial_capital}")
+            
             investments = []
             portfolio_evolution = []
             allocation_history = []
             
             cash = initial_capital
             holdings = {symbol: 0 for symbol in symbols}  # shares held
+            total_invested = 0
+            buy_transactions = 0
             
             start_date = datetime.now() - timedelta(days=days_back)
+            logger.info(f"Backtest period: {start_date.date()} to {datetime.now().date()}")
             
             for day in range(days_back):
                 current_date = start_date + timedelta(days=day)
                 
                 # Check if it's an investment day
-                if day in investment_days and cash >= investment_amount:
-                    # Execute investment
-                    investment_detail = self._execute_portfolio_investment(
-                        stock_data, symbols, allocation_weights, investment_amount, 
-                        current_date, cash, holdings
-                    )
+                if day in investment_days:
+                    logger.info(f"\n--- DAY {day} ({current_date.date()}) - INVESTMENT DAY ---")
+                    logger.info(f"Available cash: ${cash:.2f}")
                     
-                    if investment_detail:
-                        investments.append(investment_detail)
-                        cash -= investment_detail['total_invested']
+                    if cash >= investment_amount:
+                        # Execute investment
+                        investment_detail = self._execute_portfolio_investment(
+                            stock_data, symbols, allocation_weights, investment_amount, 
+                            current_date, cash, holdings
+                        )
                         
-                        # Update holdings
-                        for symbol, shares in investment_detail['shares_purchased'].items():
-                            holdings[symbol] += shares
+                        if investment_detail and investment_detail['total_invested'] > 0:
+                            investments.append(investment_detail)
+                            cash -= investment_detail['total_invested']
+                            total_invested += investment_detail['total_invested']
+                            
+                            logger.info(f"💰 INVESTMENT EXECUTED:")
+                            logger.info(f"   Amount invested: ${investment_detail['total_invested']:.2f}")
+                            
+                            # Update holdings and log each purchase
+                            for symbol, shares in investment_detail['shares_purchased'].items():
+                                if shares > 0:
+                                    holdings[symbol] += shares
+                                    buy_transactions += 1
+                                    price = investment_detail.get('prices_used', {}).get(symbol, 0)
+                                    logger.info(f"   📈 BUY {symbol}: {shares:.4f} shares @ ${price:.2f} = ${shares * price:.2f}")
+                            
+                            logger.info(f"   💳 Remaining cash: ${cash:.2f}")
+                            logger.info(f"   📊 Updated holdings: {dict(holdings)}")
+                        else:
+                            logger.warning(f"❌ Investment failed - no shares purchased")
+                    else:
+                        logger.warning(f"❌ Insufficient cash: ${cash:.2f} < ${investment_amount}")
                 
                 # Calculate portfolio value
                 portfolio_value = self._calculate_portfolio_value(
                     stock_data, holdings, current_date, cash
                 )
+                
+                # Debug: Log portfolio value calculation
+                if day % 30 == 0:  # Log every 30 days
+                    logger.info(f"Day {day}: Cash=${cash:.2f}, Holdings={holdings}, Portfolio Value=${portfolio_value:.2f}")
                 
                 current_allocation = self._calculate_current_allocation(
                     stock_data, holdings, current_date
@@ -545,12 +598,32 @@ class EnhancedBacktestingService:
                     'allocations': current_allocation
                 })
             
+            # Calculate final portfolio value at the end date
+            final_date = start_date + timedelta(days=days_back-1)
+            final_portfolio_value = self._calculate_portfolio_value(
+                stock_data, holdings, final_date, cash
+            )
+            
+            logger.info(f"\n=== PORTFOLIO BACKTEST SUMMARY ===")
+            logger.info(f"📊 Total investment periods: {len(investments)}")
+            logger.info(f"💰 Total amount invested: ${total_invested:.2f}")
+            logger.info(f"🛒 Total buy transactions: {buy_transactions}")
+            logger.info(f"💳 Final cash remaining: ${cash:.2f}")
+            logger.info(f"📈 Final holdings: {dict(holdings)}")
+            logger.info(f"💎 Final portfolio value: ${final_portfolio_value:.2f}")
+            logger.info(f"📈 Total return: ${final_portfolio_value - initial_capital:.2f}")
+            logger.info(f"📊 Return percentage: {((final_portfolio_value - initial_capital) / initial_capital) * 100:.2f}%")
+            logger.info("=== END SUMMARY ===\n")
+            
             return {
                 "investments": investments,
                 "portfolio_evolution": portfolio_evolution,
                 "allocation_history": allocation_history,
                 "final_holdings": holdings,
-                "final_cash": cash
+                "final_cash": cash,
+                "final_portfolio_value": final_portfolio_value,
+                "total_invested": total_invested,
+                "buy_transactions": buy_transactions
             }
             
         except Exception as e:
@@ -901,29 +974,235 @@ class EnhancedBacktestingService:
                                     allocation_weights: Dict, investment_amount: float,
                                     current_date: datetime, cash: float, holdings: Dict) -> Dict:
         """Execute portfolio investment for a given date"""
-        # Implementation would go here for portfolio strategy
-        return {"total_invested": 0, "shares_purchased": {}}
+        try:
+            total_invested = 0
+            shares_purchased = {}
+            
+            # Default equal allocation if no weights specified
+            if not allocation_weights:
+                allocation_weights = {symbol: 1.0/len(symbols) for symbol in symbols}
+            
+            for symbol in symbols:
+                try:
+                    # Get current price for this symbol on this date
+                    symbol_data = stock_data.get(symbol)
+                    if symbol_data is None or symbol_data.empty:
+                        continue
+                        
+                    # Find the price closest to current_date
+                    price_data = None
+                    for _, row in symbol_data.iterrows():
+                        if row['timestamp'].date() <= current_date.date():
+                            price_data = row
+                        else:
+                            break
+                    
+                    if price_data is None:
+                        continue
+                        
+                    current_price = price_data['close']
+                    weight = allocation_weights.get(symbol, 1.0/len(symbols))
+                    amount_to_invest = investment_amount * weight
+                    
+                    if amount_to_invest > 0 and current_price > 0:
+                        shares_to_buy = amount_to_invest / current_price
+                        shares_purchased[symbol] = shares_to_buy
+                        total_invested += amount_to_invest
+                        
+                except Exception as e:
+                    logger.warning(f"Error investing in {symbol}: {e}")
+                    continue
+            
+            return {
+                "total_invested": total_invested,
+                "shares_purchased": shares_purchased,
+                "investment_date": current_date,
+                "prices_used": {symbol: stock_data.get(symbol, pd.DataFrame()).iloc[-1]['close'] if not stock_data.get(symbol, pd.DataFrame()).empty else 0 for symbol in symbols}
+            }
+            
+        except Exception as e:
+            logger.error(f"Error executing portfolio investment: {e}")
+            return {"total_invested": 0, "shares_purchased": {}}
     
     def _calculate_portfolio_value(self, stock_data: Dict, holdings: Dict, 
                                  current_date: datetime, cash: float) -> float:
         """Calculate current portfolio value"""
-        # Implementation would go here
-        return cash
+        try:
+            portfolio_value = cash
+            debug_info = []
+            
+            for symbol, shares in holdings.items():
+                if shares <= 0:
+                    continue
+                    
+                symbol_data = stock_data.get(symbol)
+                if symbol_data is None or symbol_data.empty:
+                    debug_info.append(f"{symbol}: No data")
+                    continue
+                    
+                # Find the price closest to current_date - use most recent price
+                current_price = None
+                for _, row in symbol_data.iterrows():
+                    if row['timestamp'].date() <= current_date.date():
+                        current_price = row['close']
+                    else:
+                        break
+                
+                # If no price found for exact date, use the most recent available
+                if current_price is None and len(symbol_data) > 0:
+                    current_price = symbol_data.iloc[-1]['close']
+                        
+                if current_price is not None and current_price > 0:
+                    position_value = shares * current_price
+                    portfolio_value += position_value
+                    debug_info.append(f"{symbol}: {shares:.4f} × ${current_price:.2f} = ${position_value:.2f}")
+                else:
+                    debug_info.append(f"{symbol}: No valid price found")
+            
+            # Log detailed calculation occasionally
+            if len(holdings) > 0 and any(shares > 0 for shares in holdings.values()):
+                logger.info(f"Portfolio value calculation: Cash=${cash:.2f}, Holdings={debug_info}, Total=${portfolio_value:.2f}")
+                    
+            return portfolio_value
+            
+        except Exception as e:
+            logger.error(f"Error calculating portfolio value: {e}")
+            return cash
     
     def _calculate_current_allocation(self, stock_data: Dict, holdings: Dict, 
                                     current_date: datetime) -> Dict:
         """Calculate current portfolio allocation"""
-        # Implementation would go here
-        return {}
+        try:
+            allocations = {}
+            total_value = 0
+            symbol_values = {}
+            
+            # Calculate value for each holding
+            for symbol, shares in holdings.items():
+                if shares <= 0:
+                    continue
+                    
+                symbol_data = stock_data.get(symbol)
+                if symbol_data is None or symbol_data.empty:
+                    continue
+                    
+                # Find current price
+                current_price = None
+                for _, row in symbol_data.iterrows():
+                    if row['timestamp'].date() <= current_date.date():
+                        current_price = row['close']
+                    else:
+                        break
+                        
+                if current_price is not None:
+                    value = shares * current_price
+                    symbol_values[symbol] = value
+                    total_value += value
+            
+            # Calculate percentages
+            if total_value > 0:
+                for symbol, value in symbol_values.items():
+                    allocations[symbol] = (value / total_value) * 100
+                    
+            return allocations
+            
+        except Exception as e:
+            logger.error(f"Error calculating current allocation: {e}")
+            return {}
     
     def _calculate_portfolio_performance(self, results: Dict, initial_capital: float) -> Dict:
         """Calculate portfolio performance metrics"""
-        # Implementation would go here
-        return {
-            "final_capital": initial_capital,
-            "total_return": 0,
-            "total_return_pct": 0
-        }
+        try:
+            portfolio_evolution = results.get("portfolio_evolution", [])
+            investments = results.get("investments", [])
+            final_cash = results.get("final_cash", initial_capital)
+            final_portfolio_value = results.get("final_portfolio_value", initial_capital)
+            
+            logger.info(f"Performance calculation - Final portfolio value from results: ${final_portfolio_value:.2f}")
+            
+            if not investments:
+                return {
+                    "final_capital": final_portfolio_value,
+                    "total_return": final_portfolio_value - initial_capital,
+                    "total_return_pct": ((final_portfolio_value - initial_capital) / initial_capital) * 100,
+                    "total_trades": 0,
+                    "winning_trades": 0,
+                    "losing_trades": 0,
+                    "win_rate": 0,
+                    "max_drawdown": 0,
+                    "sharpe_ratio": 0
+                }
+                
+            # Use the calculated final portfolio value, fallback to last evolution point
+            if final_portfolio_value == initial_capital and portfolio_evolution:
+                final_portfolio_value = portfolio_evolution[-1]['portfolio_value']
+                logger.info(f"Using fallback final portfolio value: ${final_portfolio_value:.2f}")
+            total_return = final_portfolio_value - initial_capital
+            total_return_pct = (total_return / initial_capital) * 100 if initial_capital > 0 else 0
+            
+            # Calculate investment performance
+            total_invested = sum(inv.get('total_invested', 0) for inv in investments)
+            investment_performance = []
+            
+            # Track performance of each investment period
+            for i in range(len(portfolio_evolution) - 1):
+                current_value = portfolio_evolution[i]['portfolio_value']
+                next_value = portfolio_evolution[i + 1]['portfolio_value']
+                
+                if current_value > 0:
+                    period_return = (next_value - current_value) / current_value
+                    investment_performance.append(period_return)
+            
+            # Calculate metrics
+            winning_periods = len([p for p in investment_performance if p > 0])
+            losing_periods = len([p for p in investment_performance if p < 0])
+            win_rate = (winning_periods / len(investment_performance)) * 100 if investment_performance else 0
+            
+            # Max drawdown
+            max_drawdown = 0
+            peak = initial_capital
+            for point in portfolio_evolution:
+                value = point['portfolio_value']
+                if value > peak:
+                    peak = value
+                drawdown = ((peak - value) / peak) * 100 if peak > 0 else 0
+                max_drawdown = max(max_drawdown, drawdown)
+            
+            # Simple Sharpe ratio
+            if investment_performance:
+                avg_return = np.mean(investment_performance)
+                return_std = np.std(investment_performance) if len(investment_performance) > 1 else 0
+                sharpe_ratio = (avg_return / return_std) * np.sqrt(252) if return_std > 0 else 0
+            else:
+                sharpe_ratio = 0
+                
+            return {
+                "final_capital": final_portfolio_value,
+                "total_return": total_return,
+                "total_return_pct": total_return_pct,
+                "total_trades": len(investments),  # Number of investment periods
+                "winning_trades": winning_periods,
+                "losing_trades": losing_periods,
+                "win_rate": win_rate,
+                "max_drawdown": max_drawdown,
+                "sharpe_ratio": sharpe_ratio,
+                "total_invested": total_invested,
+                "avg_investment": total_invested / len(investments) if investments else 0
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calculating portfolio performance: {e}")
+            return {
+                "final_capital": initial_capital,
+                "total_return": 0,
+                "total_return_pct": 0,
+                "total_trades": 0,
+                "winning_trades": 0,
+                "losing_trades": 0,
+                "win_rate": 0,
+                "max_drawdown": 0,
+                "sharpe_ratio": 0
+            }
     
     def _sanitize_metrics_for_json(self, metrics: Dict) -> Dict:
         """Sanitize metrics to ensure JSON compatibility"""

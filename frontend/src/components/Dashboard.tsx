@@ -622,6 +622,7 @@ const Dashboard: React.FC = () => {
       {showBacktest && selectedStrategy && (
         <BacktestModal
           strategyId={selectedStrategy}
+          strategy={strategies.find(s => s.id === selectedStrategy)}
           onClose={() => setShowBacktest(false)}
         />
       )}

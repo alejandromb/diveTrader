@@ -232,6 +232,17 @@ async def run_backtest(strategy_id: int, request: BacktestRequest, db: Session =
         # Determine symbol based on strategy type
         symbol = "BTC/USD" if strategy_type_str == "btc_scalping" else "PORTFOLIO"
         
+        # Add debug logging before backtesting - using print to ensure visibility
+        print(f"\n🚀 STARTING BACKTEST")
+        print(f"Strategy: {strategy.name} (ID: {strategy_id})")
+        print(f"Type: {strategy_type_str}, Symbol: {symbol}")
+        print(f"Config: {request.config}")
+        print(f"Days: {request.days_back}, Capital: {request.initial_capital}")
+        
+        logger.info(f"Starting backtest for strategy {strategy.name} (ID: {strategy_id})")
+        logger.info(f"Strategy type: {strategy_type_str}, Symbol: {symbol}")
+        logger.info(f"Config: {request.config}, Days: {request.days_back}, Capital: {request.initial_capital}")
+        
         # Run enhanced backtesting
         results = enhanced_backtesting_service.run_backtest(
             strategy_type=strategy_type_str,
@@ -240,6 +251,11 @@ async def run_backtest(strategy_id: int, request: BacktestRequest, db: Session =
             days_back=request.days_back,
             initial_capital=request.initial_capital
         )
+        
+        # Debug the raw results
+        logger.info(f"Raw backtest results keys: {list(results.keys()) if results else 'None'}")
+        logger.info(f"Final capital from results: {results.get('final_capital', 'NOT FOUND')}")
+        logger.info(f"Total trades from results: {results.get('total_trades', 'NOT FOUND')}")
         
         # Ensure the response matches the frontend expectations
         response = {
@@ -257,7 +273,18 @@ async def run_backtest(strategy_id: int, request: BacktestRequest, db: Session =
             "max_drawdown": results.get("max_drawdown", 0),
             "sharpe_ratio": results.get("sharpe_ratio", 0),
             "data_source": results.get("data_source", "real"),
-            "strategy_type": strategy_type_str
+            "strategy_type": strategy_type_str,
+            # Add detailed backtest data for comprehensive reporting
+            "investment_frequency": results.get("investment_frequency", "weekly"),
+            "investment_amount": results.get("investment_amount", 1000),
+            "total_invested": results.get("total_invested", 0),
+            "symbols": results.get("symbols", []),
+            "start_date": results.get("start_date", ""),
+            "end_date": results.get("end_date", ""),
+            "investments": results.get("investments", []),
+            "portfolio_evolution": results.get("portfolio_evolution", []),
+            "allocation_history": results.get("allocation_history", {}),
+            "final_holdings": results.get("final_holdings", {})
         }
         
         return response

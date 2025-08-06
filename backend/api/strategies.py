@@ -210,26 +210,62 @@ async def run_backtest_disabled(strategy_id: int, request: BacktestRequest, db: 
         return f"ERROR: {str(e)}"
 
 @router.post("/{strategy_id}/backtest")
-async def run_backtest(strategy_id: int, request: BacktestRequest):
-    """Simple working backtest endpoint without dependencies that cause JSON issues"""
+async def run_backtest(strategy_id: int, request: BacktestRequest, db: Session = Depends(get_db)):
+    """Run comprehensive backtest for a strategy"""
     try:
-        # Return a clean, simple response without any database dependencies
-        return {
-            "strategy_id": strategy_id,
-            "backtest_status": "completed",
-            "period": f"{request.days_back} days",
-            "initial_capital": request.initial_capital,
-            "final_capital": request.initial_capital * 1.12,  # 12% return
-            "total_return_pct": 12.0,
-            "total_trades": 25,
-            "winning_trades": 16,
-            "losing_trades": 9,
-            "win_rate": 64.0,
-            "max_drawdown": 5.2,
-            "sharpe_ratio": 1.45,
-            "note": "Simplified backtesting - full system ready when JSON serialization issue is resolved"
+        # Get strategy details
+        strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+        if not strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+        
+        # Map strategy types to enhanced backtesting
+        strategy_type_map = {
+            StrategyType.BTC_SCALPING: "btc_scalping",
+            StrategyType.PORTFOLIO_DISTRIBUTOR: "portfolio_distributor"
         }
+        
+        if strategy.strategy_type not in strategy_type_map:
+            raise HTTPException(status_code=400, detail=f"Backtesting not supported for strategy type: {strategy.strategy_type.value}")
+        
+        strategy_type_str = strategy_type_map[strategy.strategy_type]
+        
+        # Determine symbol based on strategy type
+        symbol = "BTC/USD" if strategy_type_str == "btc_scalping" else "PORTFOLIO"
+        
+        # Run enhanced backtesting
+        results = enhanced_backtesting_service.run_backtest(
+            strategy_type=strategy_type_str,
+            strategy_config=request.config or {},
+            symbol=symbol,
+            days_back=request.days_back,
+            initial_capital=request.initial_capital
+        )
+        
+        # Ensure the response matches the frontend expectations
+        response = {
+            "strategy_id": strategy_id,
+            "symbol": results.get("symbol", symbol),
+            "period": results.get("period", f"{request.days_back} days"),
+            "initial_capital": results.get("initial_capital", request.initial_capital),
+            "final_capital": results.get("final_capital", request.initial_capital),
+            "total_return": results.get("total_return", 0),
+            "total_return_pct": results.get("total_return_pct", 0),
+            "total_trades": results.get("total_trades", 0),
+            "winning_trades": results.get("winning_trades", 0),
+            "losing_trades": results.get("losing_trades", 0),
+            "win_rate": results.get("win_rate", 0),
+            "max_drawdown": results.get("max_drawdown", 0),
+            "sharpe_ratio": results.get("sharpe_ratio", 0),
+            "data_source": results.get("data_source", "real"),
+            "strategy_type": strategy_type_str
+        }
+        
+        return response
+        
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Backtest error for strategy {strategy_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Backtest failed: {str(e)}")
 
 @router.post("/{strategy_id}/sync-account")

@@ -8,6 +8,7 @@ from services.trading_service import TradingService
 from services.strategy_runner import strategy_runner
 from services.backtesting_service import BacktestingService
 from services.enhanced_backtesting_service import EnhancedBacktestingService
+from services.generic_backtesting_engine import BacktestingEngine
 from services.account_sync_service import AccountSyncService
 from pydantic import BaseModel
 from typing import List, Optional
@@ -243,13 +244,13 @@ async def run_backtest(strategy_id: int, request: BacktestRequest, db: Session =
         logger.info(f"Strategy type: {strategy_type_str}, Symbol: {symbol}")
         logger.info(f"Config: {request.config}, Days: {request.days_back}, Capital: {request.initial_capital}")
         
-        # Run enhanced backtesting
-        results = enhanced_backtesting_service.run_backtest(
-            strategy_type=strategy_type_str,
-            strategy_config=request.config or {},
-            symbol=symbol,
-            days_back=request.days_back,
-            initial_capital=request.initial_capital
+        # Use the new generic backtesting engine with strategy pattern
+        backtesting_engine = BacktestingEngine(db)
+        results = backtesting_engine.run_backtest(
+            strategy_id=strategy_id,
+            config=request.config or {},
+            initial_capital=request.initial_capital,
+            days_back=request.days_back
         )
         
         # Debug the raw results
@@ -257,37 +258,12 @@ async def run_backtest(strategy_id: int, request: BacktestRequest, db: Session =
         logger.info(f"Final capital from results: {results.get('final_capital', 'NOT FOUND')}")
         logger.info(f"Total trades from results: {results.get('total_trades', 'NOT FOUND')}")
         
-        # Ensure the response matches the frontend expectations
-        response = {
-            "strategy_id": strategy_id,
-            "symbol": results.get("symbol", symbol),
-            "period": results.get("period", f"{request.days_back} days"),
-            "initial_capital": results.get("initial_capital", request.initial_capital),
-            "final_capital": results.get("final_capital", request.initial_capital),
-            "total_return": results.get("total_return", 0),
-            "total_return_pct": results.get("total_return_pct", 0),
-            "total_trades": results.get("total_trades", 0),
-            "winning_trades": results.get("winning_trades", 0),
-            "losing_trades": results.get("losing_trades", 0),
-            "win_rate": results.get("win_rate", 0),
-            "max_drawdown": results.get("max_drawdown", 0),
-            "sharpe_ratio": results.get("sharpe_ratio", 0),
-            "data_source": results.get("data_source", "real"),
-            "strategy_type": strategy_type_str,
-            # Add detailed backtest data for comprehensive reporting
-            "investment_frequency": results.get("investment_frequency", "weekly"),
-            "investment_amount": results.get("investment_amount", 1000),
-            "total_invested": results.get("total_invested", 0),
-            "symbols": results.get("symbols", []),
-            "start_date": results.get("start_date", ""),
-            "end_date": results.get("end_date", ""),
-            "investments": results.get("investments", []),
-            "portfolio_evolution": results.get("portfolio_evolution", []),
-            "allocation_history": results.get("allocation_history", {}),
-            "final_holdings": results.get("final_holdings", {})
-        }
+        # The generic backtesting engine already returns properly formatted results
+        # Just add any missing fields for backward compatibility
+        if "data_source" not in results:
+            results["data_source"] = "real"
         
-        return response
+        return results
         
     except HTTPException:
         raise

@@ -1,10 +1,47 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from sqlalchemy.orm import Session
+from dataclasses import dataclass
+from datetime import datetime
+import pandas as pd
 from services.strategy_settings_service import strategy_settings_service, SettingType
 import logging
 
 logger = logging.getLogger(__name__)
+
+@dataclass
+class BacktestTrade:
+    """Represents a trade executed during backtesting"""
+    timestamp: datetime
+    symbol: str
+    side: str  # 'buy' or 'sell'
+    quantity: float
+    price: float
+    commission: float = 0.0
+    pnl: Optional[float] = None
+    reason: str = ""
+
+@dataclass  
+class BacktestResult:
+    """Comprehensive backtesting results"""
+    strategy_type: str
+    symbol: str
+    period: str
+    start_date: datetime
+    end_date: datetime
+    initial_capital: float
+    final_capital: float
+    total_return: float
+    total_return_pct: float
+    total_trades: int
+    winning_trades: int
+    losing_trades: int
+    win_rate: float
+    max_drawdown: float
+    sharpe_ratio: float
+    trades: List[BacktestTrade]
+    equity_curve: List[Dict]  # [{date: datetime, value: float}, ...]
+    metadata: Dict[str, Any]  # Strategy-specific additional data
 
 class BaseStrategy(ABC):
     """Base class for all trading strategies with settings management"""
@@ -129,6 +166,23 @@ class BaseStrategy(ABC):
     @abstractmethod
     def stop(self) -> bool:
         """Stop the strategy (cleanup, etc.)"""
+        pass
+    
+    @abstractmethod
+    def backtest(self, data: pd.DataFrame, config: Dict[str, Any], 
+                initial_capital: float, days_back: int) -> BacktestResult:
+        """
+        Run backtesting for this strategy
+        
+        Args:
+            data: Historical price data with columns [timestamp, open, high, low, close, volume]
+            config: Strategy-specific configuration parameters
+            initial_capital: Starting capital for backtesting
+            days_back: Number of days to backtest
+            
+        Returns:
+            BacktestResult: Comprehensive backtesting results
+        """
         pass
     
     # Optional methods that can be overridden

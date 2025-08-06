@@ -6,6 +6,8 @@ Provides typed settings access with full validation and IDE support
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Union
 from sqlmodel import Session, select
+import pandas as pd
+from strategies.base_strategy import BacktestResult
 from database.sqlmodel_models import (
     Strategy, BTCScalpingSettings, PortfolioDistributorSettings, 
     StrategyTypeEnum
@@ -144,6 +146,23 @@ class TypedBaseStrategy(ABC):
     @abstractmethod
     def stop(self) -> bool:
         """Stop the strategy (cleanup, etc.)"""
+        pass
+    
+    @abstractmethod
+    def backtest(self, data: pd.DataFrame, config: Dict[str, Any], 
+                initial_capital: float, days_back: int) -> BacktestResult:
+        """
+        Run backtesting for this strategy with type-safe settings
+        
+        Args:
+            data: Historical price data with columns [timestamp, open, high, low, close, volume]
+            config: Strategy-specific configuration parameters  
+            initial_capital: Starting capital for backtesting
+            days_back: Number of days to backtest
+            
+        Returns:
+            BacktestResult: Comprehensive backtesting results
+        """
         pass
     
     # Optional methods that can be overridden

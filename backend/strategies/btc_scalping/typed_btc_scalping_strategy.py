@@ -20,7 +20,7 @@ from alpaca.data.timeframe import TimeFrame
 from alpaca.data.historical import CryptoHistoricalDataClient
 import logging
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -523,3 +523,249 @@ class TypedBTCScalpingStrategy(TypedBaseStrategy):
             }
         
         return status
+    
+    def backtest(self, data: pd.DataFrame, config: Dict[str, Any], 
+                initial_capital: float, days_back: int) -> 'BacktestResult':
+        """
+        Run backtesting for BTC scalping strategy
+        
+        This method contains the actual BTC scalping logic extracted from the 
+        enhanced backtesting service, but now properly encapsulated in the strategy.
+        """
+        from strategies.base_strategy import BacktestResult, BacktestTrade
+        from datetime import datetime, timedelta
+        
+        logger.info(f"Starting BTC scalping backtest: {len(data)} data points, ${initial_capital} initial capital")
+        
+        try:
+            # Merge strategy settings with config
+            default_config = {
+                "short_ma_periods": 5,
+                "long_ma_periods": 20,
+                "rsi_oversold": 30,
+                "rsi_overbought": 70,
+                "min_volume": 1000,
+                "position_size_pct": 0.1  # 10% of capital per trade
+            }
+            
+            btc_config = config.get('btc_scalping', {})
+            final_config = {**default_config, **btc_config}
+            
+            # Add technical indicators to data
+            data = data.copy()
+            data['short_ma'] = data['close'].rolling(window=final_config["short_ma_periods"]).mean()
+            data['long_ma'] = data['close'].rolling(window=final_config["long_ma_periods"]).mean()
+            data['rsi'] = self._calculate_rsi(data['close'], 14)
+            
+            # Trading simulation variables
+            trades = []
+            capital = initial_capital
+            current_position = None
+            equity_curve = []
+            max_portfolio_value = initial_capital
+            
+            # Run simulation
+            for i in range(final_config["long_ma_periods"], len(data)):
+                current_bar = data.iloc[i]
+                timestamp = current_bar['timestamp']
+                price = current_bar['close']
+                
+                # Record portfolio value
+                portfolio_value = capital
+                if current_position:
+                    position_value = current_position['quantity'] * price
+                    portfolio_value = capital + position_value
+                
+                equity_curve.append({
+                    'timestamp': timestamp,
+                    'portfolio_value': portfolio_value,
+                    'cash': capital
+                })
+                
+                max_portfolio_value = max(max_portfolio_value, portfolio_value)
+                
+                # Check for exit signals first
+                if current_position:
+                    should_exit, exit_reason = self._check_exit_condition(current_position, current_bar, final_config)
+                    
+                    if should_exit:
+                        # Execute exit trade
+                        pnl = self._calculate_position_pnl(current_position, price)
+                        capital += pnl
+                        
+                        trade = BacktestTrade(
+                            timestamp=timestamp,
+                            symbol="BTC/USD",
+                            side="sell" if current_position['side'] == "buy" else "buy",
+                            quantity=current_position['quantity'],
+                            price=price,
+                            pnl=pnl,
+                            reason=exit_reason
+                        )
+                        trades.append(trade)
+                        current_position = None
+                
+                # Check for entry signals
+                if not current_position:
+                    entry_signal = self._check_entry_signal(data.iloc[max(0, i-10):i+1], final_config)
+                    
+                    if entry_signal in ['buy', 'sell']:
+                        # Calculate position size
+                        position_value = capital * final_config["position_size_pct"]
+                        quantity = position_value / price
+                        
+                        current_position = {
+                            'side': entry_signal,
+                            'entry_price': price,
+                            'entry_time': timestamp,
+                            'quantity': quantity
+                        }
+                        
+                        # Record entry trade
+                        trade = BacktestTrade(
+                            timestamp=timestamp,
+                            symbol="BTC/USD", 
+                            side=entry_signal,
+                            quantity=quantity,
+                            price=price,
+                            reason="Entry signal"
+                        )
+                        trades.append(trade)
+            
+            # Calculate final metrics
+            final_capital = capital
+            if current_position:
+                # Close any remaining position
+                final_price = data.iloc[-1]['close']
+                pnl = self._calculate_position_pnl(current_position, final_price)
+                final_capital += pnl
+                
+                # Add final exit trade
+                trades.append(BacktestTrade(
+                    timestamp=data.iloc[-1]['timestamp'],
+                    symbol="BTC/USD",
+                    side="sell" if current_position['side'] == "buy" else "buy",
+                    quantity=current_position['quantity'], 
+                    price=final_price,
+                    pnl=pnl,
+                    reason="Backtest end"
+                ))
+            
+            # Calculate performance metrics
+            total_return = final_capital - initial_capital
+            total_return_pct = (total_return / initial_capital) * 100
+            
+            winning_trades = len([t for t in trades if t.pnl and t.pnl > 0])
+            losing_trades = len([t for t in trades if t.pnl and t.pnl < 0])
+            win_rate = (winning_trades / len(trades)) * 100 if trades else 0
+            
+            # Calculate max drawdown
+            peak = initial_capital
+            max_drawdown = 0
+            for point in equity_curve:
+                if point['portfolio_value'] > peak:
+                    peak = point['portfolio_value']
+                drawdown = (peak - point['portfolio_value']) / peak * 100
+                max_drawdown = max(max_drawdown, drawdown)
+            
+            # Calculate Sharpe ratio (simplified)
+            returns = []
+            for i in range(1, len(equity_curve)):
+                prev_val = equity_curve[i-1]['portfolio_value']
+                curr_val = equity_curve[i]['portfolio_value']
+                daily_return = (curr_val - prev_val) / prev_val
+                returns.append(daily_return)
+            
+            if returns:
+                import numpy as np
+                sharpe_ratio = np.mean(returns) / np.std(returns) * np.sqrt(252) if np.std(returns) > 0 else 0
+            else:
+                sharpe_ratio = 0
+            
+            # Create result
+            result = BacktestResult(
+                strategy_type="btc_scalping",
+                symbol="BTC/USD",
+                period=f"{days_back} days",
+                start_date=data.iloc[0]['timestamp'] if len(data) > 0 else datetime.now(),
+                end_date=data.iloc[-1]['timestamp'] if len(data) > 0 else datetime.now(),
+                initial_capital=initial_capital,
+                final_capital=final_capital,
+                total_return=total_return,
+                total_return_pct=total_return_pct,
+                total_trades=len(trades),
+                winning_trades=winning_trades,
+                losing_trades=losing_trades,
+                win_rate=win_rate,
+                max_drawdown=max_drawdown,
+                sharpe_ratio=sharpe_ratio,
+                trades=trades,
+                equity_curve=equity_curve,
+                metadata={"config": final_config, "data_points": len(data)}
+            )
+            
+            logger.info(f"BTC backtest completed: ${final_capital:.2f} final, {len(trades)} trades, {win_rate:.1f}% win rate")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in BTC backtest: {e}")
+            raise
+    
+    def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> pd.Series:
+        """Calculate RSI indicator"""
+        delta = prices.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+    
+    def _check_exit_condition(self, position: dict, current_bar: pd.Series, config: dict) -> tuple[bool, str]:
+        """Check if position should be exited"""
+        # Simple exit conditions - can be enhanced
+        entry_price = position['entry_price']
+        current_price = current_bar['close']
+        
+        # Stop loss: 2% loss
+        if position['side'] == 'buy' and current_price < entry_price * 0.98:
+            return True, "Stop loss"
+        elif position['side'] == 'sell' and current_price > entry_price * 1.02:
+            return True, "Stop loss"
+        
+        # Take profit: 1% gain
+        if position['side'] == 'buy' and current_price > entry_price * 1.01:
+            return True, "Take profit"
+        elif position['side'] == 'sell' and current_price < entry_price * 0.99:
+            return True, "Take profit"
+        
+        return False, ""
+    
+    def _check_entry_signal(self, recent_data: pd.DataFrame, config: dict) -> str:
+        """Check for entry signals based on technical indicators"""
+        if len(recent_data) < 2:
+            return "hold"
+        
+        current = recent_data.iloc[-1]
+        previous = recent_data.iloc[-2]
+        
+        # Simple MA crossover strategy
+        if (current['short_ma'] > current['long_ma'] and 
+            previous['short_ma'] <= previous['long_ma'] and
+            current['rsi'] < config['rsi_overbought']):
+            return "buy"
+        elif (current['short_ma'] < current['long_ma'] and 
+              previous['short_ma'] >= previous['long_ma'] and
+              current['rsi'] > config['rsi_oversold']):
+            return "sell"
+        
+        return "hold"
+    
+    def _calculate_position_pnl(self, position: dict, current_price: float) -> float:
+        """Calculate P&L for a position"""
+        entry_price = position['entry_price']
+        quantity = position['quantity']
+        
+        if position['side'] == 'buy':
+            return (current_price - entry_price) * quantity
+        else:
+            return (entry_price - current_price) * quantity

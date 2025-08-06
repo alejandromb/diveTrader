@@ -5,8 +5,9 @@ Full type safety with automatic validation and IDE support
 
 import logging
 import json
+import pandas as pd
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from sqlmodel import Session, select
 from database.sqlmodel_models import (
     Strategy, Position, Trade, Portfolio, PortfolioDistributorSettings,
@@ -334,3 +335,127 @@ class TypedPortfolioDistributorStrategy(TypedBaseStrategy):
             "investment_frequency": self.portfolio_settings.investment_frequency.value,
             "rebalance_threshold": self.portfolio_settings.rebalance_threshold
         }
+    
+    def backtest(self, data: pd.DataFrame, config: Dict[str, Any], 
+                initial_capital: float, days_back: int) -> 'BacktestResult':
+        """
+        Run backtesting for Portfolio Distributor strategy
+        
+        This method implements the portfolio investment logic extracted from the 
+        enhanced backtesting service, properly encapsulated in the strategy.
+        """
+        from strategies.base_strategy import BacktestResult, BacktestTrade
+        from services.enhanced_backtesting_service import EnhancedBacktestingService
+        import pandas as pd
+        from datetime import datetime, timedelta
+        
+        logger.info(f"Starting Portfolio Distributor backtest: ${initial_capital} initial capital, {days_back} days")
+        
+        try:
+            # Get portfolio configuration
+            portfolio_config = config.get('portfolio_distributor', {})
+            symbols = portfolio_config.get('symbols', ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'SPY'])
+            allocation_weights = portfolio_config.get('allocation_weights', {})
+            investment_frequency = portfolio_config.get('investment_frequency', 'weekly')
+            investment_amount = portfolio_config.get('investment_amount', 1000)
+            
+            # Use the enhanced backtesting service to get stock data and run the simulation
+            # This is temporary - ideally the data would be passed in properly formatted
+            enhanced_service = EnhancedBacktestingService()
+            stock_data = enhanced_service._get_portfolio_data_with_fallback(symbols, days_back)
+            
+            if not stock_data:
+                raise ValueError("No stock data available for portfolio backtesting")
+            
+            logger.info(f"Got stock data for {len(stock_data)} symbols")
+            for symbol in symbols:
+                data_points = len(stock_data.get(symbol, pd.DataFrame()))
+                logger.info(f"  {symbol}: {data_points} data points")
+            
+            # Run the portfolio simulation using existing logic
+            results = enhanced_service._simulate_portfolio_strategy(
+                stock_data, symbols, allocation_weights, investment_frequency,
+                investment_amount, initial_capital, days_back
+            )
+            
+            if not results:
+                raise ValueError("Portfolio simulation failed to return results")
+            
+            # Calculate performance metrics
+            performance = enhanced_service._calculate_portfolio_performance(results, initial_capital)
+            
+            # Extract trades from investment history
+            trades = []
+            if 'investments' in results:
+                for investment in results['investments']:
+                    for symbol, shares in investment['shares_purchased'].items():
+                        if shares > 0:
+                            price = investment['prices_used'].get(symbol, 0)
+                            trade = BacktestTrade(
+                                timestamp=datetime.fromisoformat(investment['investment_date']) 
+                                         if isinstance(investment['investment_date'], str) 
+                                         else investment['investment_date'],
+                                symbol=symbol,
+                                side='buy',
+                                quantity=shares,
+                                price=price,
+                                commission=0.0,
+                                reason='Scheduled investment'
+                            )
+                            trades.append(trade)
+            
+            # Build equity curve from portfolio evolution
+            equity_curve = []
+            if 'portfolio_evolution' in results:
+                for point in results['portfolio_evolution']:
+                    equity_curve.append({
+                        'timestamp': point.get('date'),
+                        'portfolio_value': point.get('portfolio_value', 0),
+                        'cash': point.get('cash', 0),
+                        'holdings_value': point.get('holdings_value', 0)
+                    })
+            
+            # Create comprehensive result
+            start_date = datetime.now() - timedelta(days=days_back)
+            end_date = datetime.now()
+            
+            if equity_curve:
+                start_date = equity_curve[0]['timestamp']
+                end_date = equity_curve[-1]['timestamp']
+            
+            result = BacktestResult(
+                strategy_type="portfolio_distributor",
+                symbol="PORTFOLIO",
+                period=f"{days_back} days",
+                start_date=start_date,
+                end_date=end_date,
+                initial_capital=performance.get('initial_capital', initial_capital),
+                final_capital=performance.get('final_capital', initial_capital),
+                total_return=performance.get('total_return', 0),
+                total_return_pct=performance.get('total_return_pct', 0),
+                total_trades=performance.get('total_trades', 0),
+                winning_trades=performance.get('winning_trades', 0),
+                losing_trades=performance.get('losing_trades', 0),
+                win_rate=performance.get('win_rate', 0),
+                max_drawdown=performance.get('max_drawdown', 0),
+                sharpe_ratio=performance.get('sharpe_ratio', 0),
+                trades=trades,
+                equity_curve=equity_curve,
+                metadata={
+                    "symbols": symbols,
+                    "investment_frequency": investment_frequency,
+                    "investment_amount": investment_amount,
+                    "total_invested": performance.get('total_invested', 0),
+                    "allocation_weights": allocation_weights,
+                    "investments": results.get('investments', []),
+                    "portfolio_evolution": results.get('portfolio_evolution', []),
+                    "final_holdings": results.get('final_holdings', {})
+                }
+            )
+            
+            logger.info(f"Portfolio backtest completed: ${result.final_capital:.2f} final, {result.total_trades} investment periods")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in Portfolio backtest: {e}")
+            raise
